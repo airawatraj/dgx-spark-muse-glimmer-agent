@@ -43,13 +43,16 @@ bash setup/install.sh
 # 3. Download model weights (one-time, ~60 GB)
 bash setup/download_model.sh
 
-# 4. Start vLLM container with NVFP4 W4A4
+# 4. Preflight check — validates GPU, swap, memory, Docker image, flag compat
+bash setup/preflight.sh
+
+# 5. Start vLLM container with NVFP4 W4A4
 bash docker/start.sh
 
-# 5. Check container status & logs
+# 6. Check container status & logs
 bash docker/status.sh
 
-# 6. Run benchmarks
+# 7. Run benchmarks
 uv run benchmark/benchmark_speed.py
 uv run benchmark/benchmark_smarts.py
 # Optional: full spark-arena-style overnight sweep
