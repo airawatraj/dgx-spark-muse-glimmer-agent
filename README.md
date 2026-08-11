@@ -118,20 +118,51 @@ uv run benchmark/benchmark_speed_arena.py \
 
 ## Benchmark Results Summary
 
-*Results will be populated after initial runs on DGX Spark.*
+> Benchmarks run on DGX Spark GB10 · August 2026  
+> vLLM `v0.1.dev19075+gd89ec6d6a` · tool-eval-bench `v2.3.1.dev8+g7fa6dd70b`
 
-### My Tests (`benchmark_speed.py` + `benchmark_smarts.py`)
+### Speed Benchmark (`benchmark_speed.py`)
+
+![Speed benchmark results](assets/benchmark_speed.png)
 
 | Test | Metric | Result |
 |---|---|---|
-| Baseline TPS (single session, short prompt) | Average TPS | — |
-| Baseline TPS | Peak TPS | — |
-| Baseline TPS | Avg TTFT (steady state) | — |
-| Concurrent — 2 sessions | Total TPS | — |
-| Concurrent — 4 sessions | Total TPS | — |
-| Context window — max tested | Working context | — |
-| tool-eval-bench score | Quality | — |
-| tool-eval-bench score | Deployability | — |
+| Baseline TPS — single session | Average TPS | **19.7 tok/s** |
+| Baseline TPS — single session | Peak TPS | **22.1 tok/s** |
+| Baseline TPS — single session | Avg TTFT (steady state) | **21,662 ms** |
+| TPS vs output length — 600 tok | TPS | 29.9 tok/s |
+| TPS vs output length — 1200 tok | TPS | 18.5 tok/s |
+| TPS vs output length — 2500 tok | TPS | 15.1 tok/s |
+| Concurrent — 2 sessions | Total TPS | **23.2 tok/s** |
+| Concurrent — 4 sessions | Total TPS | **45.7 tok/s** |
+| Context window — max tested | Working context | **~130,753 tokens ✓** |
+
+> **Note on TPS:** Muse-Glimmer runs in deep reasoning mode — the model completes a ~500-tok internal thinking chain before streaming any output. TTFT reflects the full reasoning phase. Token counts include both reasoning and content tokens. Peak context TPS at ~1K tokens reaches **230 tok/s**.
+
+### Smarts Benchmark (`benchmark_smarts.py` — Quick smoke test, 15 scenarios)
+
+![Smarts benchmark — scenario results](assets/benchmark_smarts_1.png)
+![Smarts benchmark — category breakdown and final score](assets/benchmark_smarts_2.png)
+
+| Category | Score | Earned |
+|---|---|---|
+| Tool Selection | 67% | 4/6 |
+| Parameter Precision | **100%** | 6/6 |
+| Multi-Step Chains | **100%** | 6/6 |
+| Restraint & Refusal | **100%** | 6/6 |
+| Error Recovery | 67% | 4/6 |
+| **Overall** | **87 / 100** | 13 pass · 0 partial · 2 fail |
+
+| Metric | Score |
+|---|---|
+| Quality | **87/100** |
+| Responsiveness | 7/100 *(median turn: 16.9s — deep reasoning overhead)* |
+| Deployability | **63/100** *(α=0.7)* |
+| Weakest category | Tool Selection (67%) |
+| Token efficiency | 58,742 tokens · 0.4 pts/1K tok |
+
+> **Responsiveness score** (7/100) is purely a latency penalty from the logistic curve used by tool-eval-bench (100 at <1s, ~50 at 3s, 0 at >10s). At a median 16.9s/turn driven by deep reasoning, this is expected. Quality score of 87/100 is the meaningful deployment signal.
+
 
 ### Spark Arena / llama-benchy (community benchmark)
 
