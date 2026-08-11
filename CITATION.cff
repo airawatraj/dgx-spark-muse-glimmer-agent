@@ -1,0 +1,29 @@
+cff-version: 1.2.0
+title: "Running Muse-Glimmer-30B-NVFP4 on DGX Spark Mini PC for Local Agentic Workloads"
+message: "If you use this setup, methodology, or benchmark data, please cite it as below."
+type: software
+authors:
+  - family-names: "Rawat"
+    given-names: "Rajendra Singh"
+    affiliation: "cogni.chat"
+    orcid: "https://orcid.org/0009-0007-5017-1341"
+repository-code: "https://github.com/airawatraj/dgx-spark-muse-glimmer-agent"
+abstract: >-
+  A technical implementation and benchmarking suite for running Inferact/Muse-Glimmer-30B-NVFP4-W4A4
+  as an autonomous agent (Cogni-Brain) on an NVIDIA DGX Spark Mini PC.
+  This repository documents the setup methodology for the vLLM OpenAI-compatible server,
+  128K context, tool-calling, and reasoning via native muse_glimmer parsers.
+keywords:
+  - "Muse-Glimmer"
+  - "Inferact"
+  - "DGX Spark"
+  - "vLLM"
+  - "AI Agents"
+  - "NVFP4"
+  - "W4A4"
+  - "Performance Benchmarking"
+  - "Tool Calling"
+  - "Reasoning"
+license: MIT
+version: 1.0.0
+date-released: "2026-08-11"
