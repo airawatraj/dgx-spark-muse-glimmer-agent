@@ -58,10 +58,16 @@ def count_tokens_approx(text):
     """Rough token count: ~0.75 words per token."""
     return int(len(text.split()) * 1.33)
 
-def stream_completion(host, port, model, prompt, max_tokens=200, timeout=180, debug=False):
+def stream_completion(host, port, model, prompt, max_tokens=800, timeout=180, debug=False):
     """
     Stream a single completion. Returns:
     (ttft_ms, tps, total_tokens, full_text, error)
+
+    NOTE: Muse-Glimmer is a full reasoning model. The muse_glimmer vLLM parser
+    buffers all tokens until </thinking> is found before releasing anything to
+    the stream. If max_tokens is exhausted before the thinking chain completes,
+    the entire response is silently dropped → 'No tokens generated'. Keep
+    max_tokens ≥ 800 for short prompts, ≥ 1500 for long/complex ones.
     """
     url = f"http://{host}:{port}/v1/chat/completions"
     payload = {
@@ -140,14 +146,14 @@ def stream_completion(host, port, model, prompt, max_tokens=200, timeout=180, de
 # ── Test 1: Baseline TPS ──────────────────────────────────────────────────────
 
 def test_baseline_tps(host, port, model, debug=False):
-    header("TEST 1 — Baseline TPS (single session, short prompt)")
+    header("TEST 1 — Baseline TPS (single session, short prompt, reasoning budget 800 tok)")
     prompt = "Explain quantum entanglement in simple terms."
     runs = 3
     results = []
 
     print("  Running warmup request (not included in averages)...")
     warmup_ttft, warmup_tps, warmup_tokens, _, warmup_err = stream_completion(
-        host, port, model, prompt, max_tokens=300, debug=debug
+        host, port, model, prompt, max_tokens=800, debug=debug
     )
     if warmup_err:
         print(c(f"  ⚠ Warmup failed: {warmup_err}", "yellow"))
@@ -159,7 +165,7 @@ def test_baseline_tps(host, port, model, debug=False):
 
     print(f"  Running {runs} consecutive requests...")
     for i in range(runs):
-        ttft, tps, tokens, _, err = stream_completion(host, port, model, prompt, max_tokens=300, debug=debug)
+        ttft, tps, tokens, _, err = stream_completion(host, port, model, prompt, max_tokens=800, debug=debug)
         if err:
             print(c(f"  ✗ Run {i+1} failed: {err}", "red"))
             continue
@@ -182,8 +188,10 @@ def test_baseline_tps(host, port, model, debug=False):
 # ── Test 2: TPS vs Output Length ──────────────────────────────────────────────
 
 def test_tps_vs_length(host, port, model):
-    header("TEST 2 — TPS vs Output Length")
-    lengths = [50, 150, 300, 600, 1000]
+    header("TEST 2 — TPS vs Output Length (min 600 tok — reasoning budget)")
+    # Muse-Glimmer's thinking chain requires ~400-500 tok before visible output.
+    # Starting below 600 produces 'No tokens generated' — not a model failure.
+    lengths = [600, 800, 1200, 1800, 2500]
     prompt = "Write a detailed explanation of how transformers work in machine learning."
 
     print(f"  {'Output tokens'.ljust(18)} {'TPS'.ljust(12)} {'TTFT'}")
@@ -220,7 +228,7 @@ def test_concurrent(host, port, model, max_concurrent=4):
             ttft, tps, tokens, _, err = stream_completion(
                 host, port, model,
                 prompts_list[idx % len(prompts_list)],
-                max_tokens=200
+                max_tokens=800  # must exceed reasoning budget
             )
             if err:
                 errors.append(err)
@@ -267,7 +275,7 @@ def test_context_window(host, port, model):
 
         ttft, tps, gen_tokens, _, err = stream_completion(
             host, port, model, prompt,
-            max_tokens=100,
+            max_tokens=600,  # must exceed reasoning budget even at large context
             timeout=300
         )
 
