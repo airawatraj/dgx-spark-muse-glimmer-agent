@@ -19,11 +19,17 @@ if [[ -z "${HF_TOKEN:-}" ]]; then
   exit 1
 fi
 
-# ── Check Cache ──────────────────────────────────────────────────────────────
-if [[ -d "$MODEL_CACHE_DIR/snapshots" ]]; then
-  SNAP_COUNT=$(find "$MODEL_CACHE_DIR/snapshots" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
-  if [[ "$SNAP_COUNT" -gt 0 ]]; then
-    echo "✓ Model already present at $MODEL_CACHE_DIR"
+# ── Check Cache ───────────────────────────────────────────────────────────────
+# Detect a completed download under either layout:
+#   - Hub cache layout:  snapshots/<hash>/*.safetensors  (huggingface-cli default)
+#   - Flat local-dir:    $MODEL_CACHE_DIR/*.safetensors   (--local-dir)
+# We check for any .safetensors file under the target dir (recursive, max depth 3)
+# and also accept config.json as a proxy if shards are not yet written.
+if [[ -d "$MODEL_CACHE_DIR" ]]; then
+  WEIGHT_COUNT=$(find "$MODEL_CACHE_DIR" -maxdepth 3 \
+    \( -name "*.safetensors" -o -name "config.json" \) 2>/dev/null | wc -l)
+  if [[ "$WEIGHT_COUNT" -gt 0 ]]; then
+    echo "✓ Model already present at $MODEL_CACHE_DIR (found $WEIGHT_COUNT weight/config files)"
     echo ""
     echo "Next: bash docker/start.sh"
     exit 0
