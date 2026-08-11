@@ -275,7 +275,7 @@ def test_context_window(host, port, model):
 
         ttft, tps, gen_tokens, _, err = stream_completion(
             host, port, model, prompt,
-            max_tokens=600,  # must exceed reasoning budget even at large context
+            max_tokens=1500,  # must exceed reasoning budget even at large context (model thinks longer at larger depths)
             timeout=300
         )
 
