@@ -174,7 +174,7 @@ dgx-spark-muse-glimmer-agent/
 - **NVIDIA DGX Spark Mini PC** (GB10 Grace-Blackwell Superchip)
 - **128 GB unified memory** (CPU + GPU shared)
 - **NVFP4 W4A4 Quantisation** — Both weights and activations quantized, enabling maximum throughput on Blackwell Tensor Cores
-- **30B dense model** — Lower memory footprint than MoE alternatives; fits comfortably in DGX Spark unified memory at `--gpu-memory-utilization 0.75`
+- **30B dense model** — Lower memory footprint than MoE alternatives; fits comfortably in DGX Spark unified memory at `--gpu-memory-utilization 0.85`
 - Tool-calling and reasoning via native `muse_glimmer` parsers
 - `--generation-config auto` — uses model-embedded generation config for optimal quality/speed
 
@@ -189,7 +189,10 @@ dgx-spark-muse-glimmer-agent/
 | `--tensor-parallel-size` | `1` | Single DGX Spark (single GPU domain) |
 | `--max-model-len` | `131072` | Full 128K native context window |
 | `--max-num-seqs` | `8` | Reduces KV memory fragmentation under batching |
-| `--gpu-memory-utilization` | `0.75` | Conservative headroom for 30B model in 128 GB unified memory |
+| `--gpu-memory-utilization` | `0.85` | More KV cache headroom — safe for 30B W4A4 model (~15–18 GB weights) in 128 GB unified memory |
+| `--kv-cache-dtype` | `fp8` | Native GB10 FP8 KV cache — ~15–25% TPS gain, negligible quality delta on already-quantized model |
+| `--num-scheduler-steps` | `8` | Multi-step scheduling — amortises overhead, improves throughput on long sequences |
+| `--disable-log-stats` | on | Removes Prometheus metric collection overhead during inference |
 | `--enable-auto-tool-choice` | on | Automatic tool call mode detection |
 | `--tool-call-parser` | `muse_glimmer` | Native Muse-Glimmer tool parser |
 | `--reasoning-parser` | `muse_glimmer` | Native thinking-token parser |
@@ -217,12 +220,15 @@ docker run -d \
   --served-model-name Cogni-Brain \
   --tensor-parallel-size 1 \
   --max-model-len 131072 \
-  --gpu-memory-utilization 0.75 \
+  --gpu-memory-utilization 0.85 \
+  --kv-cache-dtype fp8 \
   --max-num-seqs 8 \
+  --num-scheduler-steps 8 \
   --enable-auto-tool-choice \
   --tool-call-parser muse_glimmer \
   --reasoning-parser muse_glimmer \
-  --generation-config auto
+  --generation-config auto \
+  --disable-log-stats
 ```
 
 ---
