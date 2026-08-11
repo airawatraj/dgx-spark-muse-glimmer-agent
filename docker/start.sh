@@ -66,7 +66,6 @@ docker run -d \
   --gpu-memory-utilization 0.85 \
   --kv-cache-dtype fp8 \
   --max-num-seqs 8 \
-  --num-scheduler-steps 8 \
   --enable-auto-tool-choice \
   --tool-call-parser muse_glimmer \
   --reasoning-parser muse_glimmer \
