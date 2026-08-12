@@ -166,8 +166,11 @@ uv run benchmark/benchmark_speed_arena.py \
 
 ### Spark Arena / llama-benchy (community benchmark)
 
+![Spark Arena Benchmark Results](assets/spark_arena_muse-glimmer-30b.png)
+
 | Metric | Spark Arena Result |
 |---|---|
+| Run Link | [spark-arena.com/benchmark/ec3851cb-e755-4522-a3bf-f1806cbdd14f](https://spark-arena.com/benchmark/ec3851cb-e755-4522-a3bf-f1806cbdd14f) |
 | Run author | Rajendra Rawat |
 | Model | Inferact/Muse-Glimmer-30B-NVFP4-W4A4 |
 | Runtime | vLLM (vllm/vllm-openai:muse-glimmer) |
@@ -176,7 +179,7 @@ uv run benchmark/benchmark_speed_arena.py \
 | `--max-model-len` | 131,072 |
 | Context depths tested | 0, 4K, 8K, 16K, 32K, 64K, 128K |
 | Concurrency sweep | 1, 2, 5, 10 |
-| Data points | — |
+| Data points | 28 |
 
 ---
 
