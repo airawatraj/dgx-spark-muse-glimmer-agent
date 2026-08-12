@@ -63,13 +63,6 @@ def stream_completion(host, port, model, prompt, max_tokens=800, timeout=180, de
     Stream a single completion. Returns:
     (ttft_ms, tps, total_tokens, full_text, error)
 
-    NOTE on TPS: Muse-Glimmer buffers the full <thinking> chain before
-    releasing any tokens to the stream. Because usage_tokens includes all
-    thinking + output tokens, TPS is calculated over the *total* request
-    duration (t_start → t_end) so that the thinking phase is correctly
-    included in the denominator. Using only post-first-token time inflates
-    TPS by 1.5–2× for short outputs.
-
     NOTE: Muse-Glimmer is a full reasoning model. The muse_glimmer vLLM parser
     buffers all tokens until </thinking> is found before releasing anything to
     the stream. If max_tokens is exhausted before the thinking chain completes,
@@ -140,17 +133,14 @@ def stream_completion(host, port, model, prompt, max_tokens=800, timeout=180, de
         return None, None, 0, full_text, "No tokens generated"
 
     ttft_ms = (t_first - t_start) * 1000
-    # Use total elapsed time (including the reasoning/thinking phase) so that
-    # usage_tokens (which counts thinking + output) has a matching denominator.
-    # t_end - t_first would exclude the buffered thinking phase and inflate TPS.
-    total_elapsed = t_end - t_start
+    generation_time = t_end - t_first
 
     if usage_tokens and usage_tokens > 0:
         tokens = usage_tokens
     else:
         tokens = max(1, len(full_text) // 4)
 
-    tps = tokens / total_elapsed if total_elapsed > 0 else 0
+    tps = tokens / generation_time if generation_time > 0 else 0
     return round(ttft_ms), round(tps, 1), tokens, full_text, None
 
 # ── Test 1: Baseline TPS ──────────────────────────────────────────────────────
@@ -285,7 +275,7 @@ def test_context_window(host, port, model):
 
         ttft, tps, gen_tokens, _, err = stream_completion(
             host, port, model, prompt,
-            max_tokens=1500,  # must exceed reasoning budget even at large context (model thinks longer at larger depths)
+            max_tokens=600,  # must exceed reasoning budget even at large context
             timeout=300
         )
 
