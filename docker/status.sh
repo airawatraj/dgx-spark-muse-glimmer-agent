@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # docker/status.sh
-# Shows the health of the spark-brain container, system memory, and VmSwap.
+# Shows the health of the spark-brain container, system memory, VmSwap, and DFlash status.
 # Read-only diagnostic — never modifies system state.
 # Uses set -uo pipefail (NOT -e) so individual check failures print gracefully
 # rather than aborting the whole status report.
 set -uo pipefail
 
 CONTAINER="spark-brain"
-PORT=8000
+PORT="${PORT:-8000}"
 
 echo "=== spark-brain status ==="
 echo ""
@@ -31,6 +31,13 @@ if curl -sf "http://localhost:${PORT}/health" &>/dev/null; then
   echo "  vLLM API:   healthy (http://localhost:${PORT})"
 else
   echo "  vLLM API:   not reachable"
+fi
+
+# ── DFlash Speculative Status ─────────────────────────────────────────────────
+if [[ "$CONTAINER_RUNNING" == "true" ]]; then
+  if docker logs "$CONTAINER" 2>&1 | grep -qi "dflash"; then
+    echo "  Speculative: DFlash drafter active ✓"
+  fi
 fi
 
 # ── Memory ────────────────────────────────────────────────────────────────────
@@ -60,7 +67,7 @@ fi
 
 # ── KV cache usage ────────────────────────────────────────────────────────────
 echo ""
-echo "=== KV cache ==="
+echo "=== KV cache & Requests ==="
 METRICS=$(curl -sf "http://localhost:${PORT}/metrics" 2>/dev/null || echo "")
 if [[ -n "$METRICS" ]]; then
   KV=$(printf '%s\n' "$METRICS" \
@@ -84,3 +91,4 @@ elif docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q "^${CONTAINER}$"; 
 else
   echo "  No $CONTAINER container found"
 fi
+

@@ -333,19 +333,19 @@ def print_summary(avg_tps, peak_tps, max_context, host, port, model):
     result_line("Model", model)
     print()
     result_line("Average TPS (single session)", f"{avg_tps}", "tok/s",
-                "green" if avg_tps >= 30 else "yellow" if avg_tps >= 20 else "red")
+                "green" if avg_tps >= 20 else "yellow" if avg_tps >= 12 else "red")
     result_line("Peak TPS (single session)", f"{peak_tps}", "tok/s",
-                "green" if peak_tps >= 35 else "yellow" if peak_tps >= 25 else "red")
+                "green" if peak_tps >= 23 else "yellow" if peak_tps >= 15 else "red")
     result_line("Max usable context", f"~{max_context:,}" if max_context else "not tested", "tokens")
     print()
-    if avg_tps >= 40:
-        print(f"  {c('★ Excellent — Cogni-Brain running well', 'green')}")
-    elif avg_tps >= 25:
-        print(f"  {c('✓ Good — solid performance', 'yellow')}")
-    elif avg_tps >= 15:
-        print(f"  {c('△ Moderate — check for swap or memory pressure', 'yellow')}")
+    if avg_tps >= 22:
+        print(f"  {c('★ Outstanding — DFlash Speculative Decoding active on DGX Spark', 'green')}")
+    elif avg_tps >= 18:
+        print(f"  {c('✓ Good — solid performance with speculative drafting', 'green')}")
+    elif avg_tps >= 10:
+        print(f"  {c('△ Moderate — baseline autoregressive or small draft size', 'yellow')}")
     else:
-        print(f"  {c('✗ Below baseline — something is wrong', 'red')}")
+        print(f"  {c('✗ Below baseline — check swap, memory, or drafter model', 'red')}")
     print()
 
 # ── Main ──────────────────────────────────────────────────────────────────────

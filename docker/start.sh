@@ -1,15 +1,22 @@
 #!/usr/bin/env bash
 # docker/start.sh
 # Launches Inferact/Muse-Glimmer-30B-NVFP4-W4A4 (as Cogni-Brain)
-# on a single DGX Spark Mini PC via plain docker run.
+# on a single DGX Spark Mini PC with DFlash Speculative Decoding.
 # Configured for 128K context window (131,072 tokens) and tool calling + reasoning.
 # Safe to run multiple times — removes any existing spark-brain container first.
 set -euo pipefail
 
 CONTAINER="spark-brain"
-MODEL_ID="Inferact/Muse-Glimmer-30B-NVFP4-W4A4"
-SERVED_NAME="Cogni-Brain"
-PORT=8000
+MODEL_ID="${MODEL_ID:-Inferact/Muse-Glimmer-30B-NVFP4-W4A4}"
+DFLASH_MODEL_ID="${DFLASH_MODEL_ID:-Inferact/Muse-Glimmer-dflash}"
+ENABLE_DFLASH="${ENABLE_DFLASH:-1}"
+NUM_SPEC_TOKENS="${NUM_SPEC_TOKENS:-15}"
+SERVED_NAME="${SERVED_NAME:-Cogni-Brain}"
+PORT="${PORT:-8000}"
+GPU_MEM_UTIL="${GPU_MEM_UTIL:-0.92}"
+KV_CACHE_BYTES="${KV_CACHE_BYTES:-4147483648}"
+MAX_BATCHED_TOKENS="${MAX_BATCHED_TOKENS:-8196}"
+MAX_MODEL_LEN="${MAX_MODEL_LEN:-131072}"
 
 # ── Preflight checks ──────────────────────────────────────────────────────────
 echo "=== spark-brain preflight ==="
@@ -41,15 +48,45 @@ if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q "^${CONTAINER}$"; th
 fi
 
 echo ""
-echo "    Model:    $MODEL_ID"
-echo "    Alias:    $SERVED_NAME"
-echo "    Hardware: NVIDIA DGX Spark (Grace-Blackwell sm_121a)"
-echo "    Context:  131072 tokens (128K)"
-echo "    Port:     $PORT"
+echo "    Model:           $MODEL_ID"
+echo "    Alias:           $SERVED_NAME"
+echo "    Hardware:        NVIDIA DGX Spark (Grace-Blackwell sm_121a)"
+echo "    DFlash Drafter:  $([ "$ENABLE_DFLASH" = "1" ] && echo "$DFLASH_MODEL_ID (speculative tokens: $NUM_SPEC_TOKENS)" || echo "Disabled")"
+echo "    Context Window:  $MAX_MODEL_LEN tokens (128K)"
+echo "    Memory Util:     $GPU_MEM_UTIL"
+echo "    Port:            $PORT"
 echo ""
 
+# ── Construct vLLM Engine Arguments ───────────────────────────────────────────
+VLLM_ARGS=(
+  "$MODEL_ID"
+  --served-model-name "$SERVED_NAME"
+  --tensor-parallel-size 1
+  --max-model-len "$MAX_MODEL_LEN"
+  --gpu-memory-utilization "$GPU_MEM_UTIL"
+  --kv-cache-dtype fp8
+  --kv-cache-memory-bytes "$KV_CACHE_BYTES"
+  --max-num-batched-tokens "$MAX_BATCHED_TOKENS"
+  --max-num-seqs 8
+  --load-format fastsafetensors
+  --attention-backend triton_attn
+  --enable-chunked-prefill
+  --enable-auto-tool-choice
+  --tool-call-parser muse_glimmer
+  --reasoning-parser muse_glimmer
+  --generation-config auto
+  --override-generation-config '{"temperature": 0.7, "top_p": 0.8, "top_k": 20, "presence_penalty": 0.0, "repetition_penalty": 1.0}'
+  --disable-log-stats
+)
+
+if [[ "$ENABLE_DFLASH" == "1" ]]; then
+  VLLM_ARGS+=(
+    --speculative-config "{\"method\":\"dflash\",\"num_speculative_tokens\":$NUM_SPEC_TOKENS,\"model\":\"$DFLASH_MODEL_ID\"}"
+  )
+fi
+
 # ── Launch via plain docker run ───────────────────────────────────────────────
-echo "Starting $CONTAINER (Muse-Glimmer-30B NVFP4 W4A4)..."
+echo "Starting $CONTAINER (Muse-Glimmer-30B NVFP4 W4A4 + DFlash)..."
 
 docker run -d \
   --name "$CONTAINER" \
@@ -59,23 +96,13 @@ docker run -d \
   -v "$HOME/.cache/huggingface:/root/.cache/huggingface" \
   -p "${PORT}:8000" \
   vllm/vllm-openai:muse-glimmer \
-  "$MODEL_ID" \
-  --served-model-name "$SERVED_NAME" \
-  --tensor-parallel-size 1 \
-  --max-model-len 131072 \
-  --gpu-memory-utilization 0.85 \
-  --kv-cache-dtype fp8 \
-  --max-num-seqs 8 \
-  --enable-auto-tool-choice \
-  --tool-call-parser muse_glimmer \
-  --reasoning-parser muse_glimmer \
-  --generation-config auto \
-  --disable-log-stats
+  "${VLLM_ARGS[@]}"
 
 echo ""
 echo "Container started."
-echo "Startup can take several minutes — the model is being loaded."
+echo "Startup takes ~30–60s with FastSafeTensors memory mapping."
 echo ""
 echo "Monitor: docker logs -f $CONTAINER"
 echo "Health:  curl -sf http://localhost:$PORT/health && echo OK"
 echo "Stop:    bash docker/stop.sh"
+

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # setup/preflight.sh
-# Pre-benchmark preflight for DGX Spark · Muse-Glimmer-30B-NVFP4-W4A4
+# Pre-benchmark preflight for DGX Spark · Muse-Glimmer-30B-NVFP4-W4A4 + DFlash
 # Run this on the DGX Spark before docker/start.sh and benchmarking.
 # Read-only — makes no changes to the system.
 # Exit code: 0 = all checks passed, 1 = one or more FAIL
@@ -8,9 +8,11 @@ set -uo pipefail
 
 PASS=0; WARN=0; FAIL=0
 IMAGE="vllm/vllm-openai:muse-glimmer"
-MODEL_ID="Inferact/Muse-Glimmer-30B-NVFP4-W4A4"
+MODEL_ID="${MODEL_ID:-Inferact/Muse-Glimmer-30B-NVFP4-W4A4}"
+DFLASH_MODEL_ID="${DFLASH_MODEL_ID:-Inferact/Muse-Glimmer-dflash}"
 HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
-MODEL_CACHE_DIR="$HF_HOME/hub/models--Inferact--Muse-Glimmer-30B-NVFP4-W4A4"
+MODEL_CACHE_DIR="$HF_HOME/hub/models--${MODEL_ID//\//--}"
+DFLASH_CACHE_DIR="$HF_HOME/hub/models--${DFLASH_MODEL_ID//\//--}"
 PORT=8000
 
 GREEN="\033[92m"; YELLOW="\033[93m"; RED="\033[91m"
@@ -21,7 +23,7 @@ warn()  { echo -e "  ${YELLOW}⚠ WARN${RESET}  $1"; ((WARN++)); }
 fail()  { echo -e "  ${RED}✗ FAIL${RESET}  $1"; ((FAIL++));  }
 header(){ echo -e "\n${BOLD}$1${RESET}"; echo "  $(printf '─%.0s' {1..55})"; }
 
-echo -e "\n${BOLD}DGX Spark · Muse-Glimmer-30B Preflight Check${RESET}"
+echo -e "\n${BOLD}DGX Spark · Muse-Glimmer-30B + DFlash Preflight Check${RESET}"
 echo -e "${DIM}  $(date)${RESET}"
 
 # ── 1. GPU ────────────────────────────────────────────────────────────────────
@@ -40,11 +42,11 @@ if command -v nvidia-smi &>/dev/null; then
   CC=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1)
   echo -e "     Compute capability: ${CC:-unknown}"
   if [[ "${CC%%.*}" -ge 12 ]] 2>/dev/null; then
-    pass "Blackwell (sm_12x) detected — FP8 KV cache natively supported"
+    pass "Blackwell (sm_12x) detected — FP8 KV cache and NVFP4 Tensor Cores natively supported"
   elif [[ "${CC%%.*}" -ge 9 ]] 2>/dev/null; then
-    warn "Hopper (sm_9x) — FP8 KV cache supported but check vLLM build"
+    warn "Hopper (sm_9x) — FP8 KV cache supported; check NVFP4 kernel compatibility"
   else
-    warn "Compute cap ${CC:-unknown} — --kv-cache-dtype fp8 may not be supported; consider removing it"
+    warn "Compute cap ${CC:-unknown} — check hardware compatibility with Blackwell NVFP4"
   fi
 else
   fail "nvidia-smi not found — NVIDIA driver not installed or not on PATH"
@@ -85,7 +87,7 @@ else
 fi
 
 if [[ "$FREE_GB" -ge 80 ]] 2>/dev/null; then
-  pass "${FREE_GB} GB free — enough headroom for model + KV cache at gpu-util 0.85"
+  pass "${FREE_GB} GB free — ample headroom for target model + drafter + KV cache at gpu-util 0.92"
 elif [[ "$FREE_GB" -ge 50 ]] 2>/dev/null; then
   warn "${FREE_GB} GB free — may be tight; stop other processes before starting"
 else
@@ -98,24 +100,35 @@ header "4 / Disk Space"
 CACHE_DISK=$(df -BG "$HF_HOME" 2>/dev/null | awk 'NR==2 {gsub("G",""); print $4}' || echo "?")
 echo -e "     HF cache location: $HF_HOME"
 echo -e "     Available: ${CACHE_DISK} GB"
-if [[ "$CACHE_DISK" -ge 70 ]] 2>/dev/null; then
-  pass "≥70 GB free on model cache disk"
-elif [[ "$CACHE_DISK" -ge 40 ]] 2>/dev/null; then
-  warn "${CACHE_DISK} GB free — model is ~60 GB; may be tight"
+if [[ "$CACHE_DISK" -ge 40 ]] 2>/dev/null; then
+  pass "≥40 GB free on model cache disk (target + drafter is ~20 GB)"
+elif [[ "$CACHE_DISK" -ge 20 ]] 2>/dev/null; then
+  warn "${CACHE_DISK} GB free — weights require ~20 GB total; may be close"
 else
-  fail "${CACHE_DISK} GB free — model requires ~60 GB; free space first"
+  fail "${CACHE_DISK} GB free — insufficient disk space; free space first"
 fi
 
 # ── 5. Model weights ──────────────────────────────────────────────────────────
 header "5 / Model Weights"
 
+# Check primary model
 WEIGHT_COUNT=$(find "$MODEL_CACHE_DIR" -maxdepth 3 \
   \( -name "*.safetensors" -o -name "config.json" \) 2>/dev/null | wc -l)
 if [[ "$WEIGHT_COUNT" -gt 0 ]]; then
   WEIGHT_SIZE=$(du -sh "$MODEL_CACHE_DIR" 2>/dev/null | cut -f1 || echo "?")
-  pass "Model found at $MODEL_CACHE_DIR ($WEIGHT_SIZE on disk, $WEIGHT_COUNT files)"
+  pass "Target Model found at $MODEL_CACHE_DIR ($WEIGHT_SIZE on disk, $WEIGHT_COUNT files)"
 else
-  fail "Model weights not found at $MODEL_CACHE_DIR — run setup/download_model.sh first"
+  fail "Target model weights not found at $MODEL_CACHE_DIR — run setup/download_model.sh"
+fi
+
+# Check DFlash drafter model
+DFLASH_COUNT=$(find "$DFLASH_CACHE_DIR" -maxdepth 3 \
+  \( -name "*.safetensors" -o -name "config.json" \) 2>/dev/null | wc -l)
+if [[ "$DFLASH_COUNT" -gt 0 ]]; then
+  DFLASH_SIZE=$(du -sh "$DFLASH_CACHE_DIR" 2>/dev/null | cut -f1 || echo "?")
+  pass "DFlash Drafter found at $DFLASH_CACHE_DIR ($DFLASH_SIZE on disk, $DFLASH_COUNT files)"
+else
+  warn "DFlash drafter weights not found at $DFLASH_CACHE_DIR — run setup/download_model.sh for 23+ tok/s speculative speed"
 fi
 
 # ── 6. Docker & NVIDIA Container Toolkit ─────────────────────────────────────
@@ -128,20 +141,18 @@ else
   fail "Docker daemon not running — start Docker first"
 fi
 
-# Check NVIDIA container runtime is registered
 if docker info 2>/dev/null | grep -q "nvidia"; then
   pass "NVIDIA container runtime registered in Docker"
 else
   fail "NVIDIA container runtime not found — install nvidia-container-toolkit and restart Docker"
 fi
 
-# Check --gpus all works with a smoke test
 if docker run --rm --gpus all --entrypoint nvidia-smi \
     "$IMAGE" --query-gpu=name --format=csv,noheader &>/dev/null 2>&1; then
   pass "--gpus all works inside $IMAGE"
 elif docker run --rm --gpus all nvidia/cuda:12.0-base nvidia-smi \
     --query-gpu=name --format=csv,noheader &>/dev/null 2>&1; then
-  pass "--gpus all works (tested with nvidia/cuda image; muse-glimmer image may not have nvidia-smi)"
+  pass "--gpus all works (tested with nvidia/cuda image)"
 else
   warn "Could not verify --gpus all inside container — check nvidia-container-toolkit"
 fi
@@ -155,7 +166,6 @@ if docker image inspect "$IMAGE" &>/dev/null 2>&1; then
   pass "Image present locally (${IMG_GB} GB)"
 else
   fail "Image $IMAGE not pulled — run: docker pull $IMAGE"
-  echo -e "     ${DIM}This can take 10–30 min on first pull${RESET}"
 fi
 
 # ── 8. Port availability ──────────────────────────────────────────────────────
@@ -163,7 +173,6 @@ header "8 / Port $PORT"
 
 if ss -tlnp 2>/dev/null | grep -q ":${PORT} " || \
    netstat -tlnp 2>/dev/null | grep -q ":${PORT} "; then
-  # Check if it's our own container
   if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^spark-brain$"; then
     warn "Port $PORT in use — but spark-brain container is running (will be replaced by start.sh)"
   else
@@ -180,31 +189,35 @@ if [[ -n "${HF_TOKEN:-}" ]]; then
   MASKED="${HF_TOKEN:0:4}****${HF_TOKEN: -4}"
   pass "HF_TOKEN is set ($MASKED)"
 else
-  warn "HF_TOKEN not set — model weights may already be downloaded; set before running start.sh"
+  warn "HF_TOKEN not set — set before running start.sh if downloading gated models"
 fi
 
 # ── 10. vLLM flag compatibility ───────────────────────────────────────────────
-header "10 / vLLM Flag Compatibility (dry-run)"
+header "10 / vLLM Engine Flags (dry-run)"
 
-# Check if the image supports --kv-cache-dtype and --num-scheduler-steps
-# by running vllm --help and grepping for the flags
 VLLM_HELP=$(docker run --rm "$IMAGE" --help 2>/dev/null || echo "")
-if echo "$VLLM_HELP" | grep -q "kv-cache-dtype"; then
-  pass "--kv-cache-dtype supported by this image"
+if echo "$VLLM_HELP" | grep -q "speculative-config"; then
+  pass "--speculative-config supported (DFlash enabled)"
 else
-  warn "--kv-cache-dtype not found in vllm --help — may be unsupported; remove from start.sh if container fails to start"
+  warn "--speculative-config not found in vllm --help"
 fi
 
-if echo "$VLLM_HELP" | grep -q "num-scheduler-steps"; then
-  pass "--num-scheduler-steps supported by this image"
+if echo "$VLLM_HELP" | grep -q "load-format"; then
+  pass "--load-format fastsafetensors supported"
 else
-  warn "--num-scheduler-steps not found in vllm --help — may be unsupported; remove from start.sh if container fails to start"
+  warn "--load-format not found in vllm --help"
 fi
 
-if echo "$VLLM_HELP" | grep -q "disable-log-stats"; then
-  pass "--disable-log-stats supported by this image"
+if echo "$VLLM_HELP" | grep -q "attention-backend"; then
+  pass "--attention-backend triton_attn supported"
 else
-  warn "--disable-log-stats not found — minor; remove if needed"
+  warn "--attention-backend not found in vllm --help"
+fi
+
+if echo "$VLLM_HELP" | grep -q "enable-chunked-prefill"; then
+  pass "--enable-chunked-prefill supported"
+else
+  warn "--enable-chunked-prefill not found in vllm --help"
 fi
 
 # ── 11. Existing spark-brain container ────────────────────────────────────────
@@ -213,7 +226,7 @@ header "11 / Existing spark-brain Container"
 if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q "^spark-brain$"; then
   STATUS=$(docker inspect spark-brain --format '{{.State.Status}}' 2>/dev/null || echo "unknown")
   if [[ "$STATUS" == "running" ]]; then
-    warn "spark-brain already running — start.sh will stop and replace it"
+    warn "spark-brain already running — start.sh will replace it cleanly"
   else
     warn "spark-brain container exists (status: $STATUS) — start.sh will remove it"
   fi
@@ -244,3 +257,4 @@ else
   echo ""
   exit 0
 fi
+
