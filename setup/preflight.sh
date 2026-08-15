@@ -9,7 +9,7 @@ set -uo pipefail
 PASS=0; WARN=0; FAIL=0
 IMAGE="vllm/vllm-openai:muse-glimmer"
 MODEL_ID="${MODEL_ID:-Inferact/Muse-Glimmer-30B-NVFP4-W4A4}"
-DFLASH_MODEL_ID="${DFLASH_MODEL_ID:-Inferact/Muse-Glimmer-dflash}"
+DFLASH_MODEL_ID="${DFLASH_MODEL_ID:-meta-models/Muse-Glimmer-30B-assistant}"
 HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
 MODEL_CACHE_DIR="$HF_HOME/hub/models--${MODEL_ID//\//--}"
 DFLASH_CACHE_DIR="$HF_HOME/hub/models--${DFLASH_MODEL_ID//\//--}"

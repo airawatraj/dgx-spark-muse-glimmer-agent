@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # setup/download_model.sh
 # Downloads Inferact/Muse-Glimmer-30B-NVFP4-W4A4 weights and the
-# Inferact/Muse-Glimmer-dflash speculative drafter via huggingface-cli.
-# Safe to run multiple times — skips download if models are already cached.
+# DFlash speculative drafter (meta-models/Muse-Glimmer-30B-assistant) via huggingface-cli / uv.
+# Safe to run multiple times (idempotent) — skips download if models are already cached.
 # Run this before docker/start.sh
 set -euo pipefail
 
 MODEL_ID="${MODEL_ID:-Inferact/Muse-Glimmer-30B-NVFP4-W4A4}"
-DFLASH_MODEL_ID="${DFLASH_MODEL_ID:-Inferact/Muse-Glimmer-dflash}"
+DFLASH_MODEL_ID="${DFLASH_MODEL_ID:-meta-models/Muse-Glimmer-30B-assistant}"
 
 # huggingface-cli places weights under $HF_HOME/hub by default.
 HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
@@ -33,7 +33,7 @@ download_repo() {
     count=$(find "$target_dir" -maxdepth 3 \
       \( -name "*.safetensors" -o -name "config.json" \) 2>/dev/null | wc -l)
     if [[ "$count" -gt 0 ]]; then
-      echo "  ✓ Model already cached at $target_dir ($count weight/config files)"
+      echo "  ✓ Model already cached at $target_dir ($count weight/config files) — skipping download."
       return 0
     fi
   fi
@@ -43,8 +43,13 @@ download_repo() {
     huggingface-cli download "$repo_id" \
       --local-dir "$target_dir" \
       --token "$HF_TOKEN"
+  elif command -v uv &>/dev/null; then
+    echo "  Using isolated uv tool run for huggingface-cli..."
+    uv tool run --from huggingface_hub huggingface-cli download "$repo_id" \
+      --local-dir "$target_dir" \
+      --token "$HF_TOKEN"
   else
-    echo "  huggingface-cli not found — falling back to Python huggingface_hub..."
+    echo "  huggingface-cli not found — using Python huggingface_hub..."
     python3 -c "
 from huggingface_hub import snapshot_download
 import os
@@ -67,6 +72,7 @@ echo ""
 download_repo "$DFLASH_MODEL_ID" "$DFLASH_CACHE_DIR" "DFlash Speculative Drafter"
 
 echo ""
-echo "✓ All model weights ready in $HF_HOME."
+echo "✓ All model weights verified in $HF_HOME."
 echo "Next: bash setup/preflight.sh && bash docker/start.sh"
+
 

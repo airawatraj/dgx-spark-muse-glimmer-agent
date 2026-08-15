@@ -22,7 +22,7 @@ This repository contains the production-grade DGX Spark inference configuration 
 On unified-memory hardware like the NVIDIA DGX Spark (Grace-Blackwell GB10 with 128 GB unified memory), autoregressive decoding for dense 30B models is bottlenecked by memory bandwidth rather than compute. Streaming 30B weights sequentially results in ~5–8 tok/s baseline.
 
 **The DFlash Breakthrough:**
-By pairing the dense 30B model with a lightweight DFlash assistant drafter (`Inferact/Muse-Glimmer-dflash`) with $K = 15$ speculative draft tokens:
+By pairing the dense 30B model with a lightweight DFlash assistant drafter (`meta-models/Muse-Glimmer-30B-assistant`) with $K = 15$ speculative draft tokens:
 - The drafter proposes candidate tokens at high compute speeds.
 - The 30B model verifies the batch in a single forward pass, reading model weights once across multiple accepted tokens.
 - **Generation speed leaps from ~5–8 tok/s to 23+ tok/s** without losing 1 bit of target model intelligence or accuracy!
@@ -118,7 +118,7 @@ uv run benchmark/benchmark_speed_arena.py --save-result benchmark/results_full.c
 ## Benchmark Results Summary
 
 > Benchmarks run on DGX Spark GB10 · August 2026  
-> Model: `Inferact/Muse-Glimmer-30B-NVFP4-W4A4` + `Inferact/Muse-Glimmer-dflash`  
+> Model: `Inferact/Muse-Glimmer-30B-NVFP4-W4A4` + `meta-models/Muse-Glimmer-30B-assistant`  
 > vLLM `v0.1.dev19075+gd89ec6d6a` · tool-eval-bench `v2.3.1.dev8+g7fa6dd70b`
 
 ### Speed Benchmark (`benchmark_speed.py`)
@@ -163,7 +163,7 @@ uv run benchmark/benchmark_speed_arena.py --save-result benchmark/results_full.c
 | Parameter | Value | Technical Rationale |
 |---|---|---|
 | Target Model | `Inferact/Muse-Glimmer-30B-NVFP4-W4A4` | Dense 30B reasoning model with NVFP4 weights + activations |
-| Drafter Model | `Inferact/Muse-Glimmer-dflash` | Speculative assistant model for DFlash acceleration |
+| Drafter Model | `meta-models/Muse-Glimmer-30B-assistant` | Speculative assistant model for DFlash acceleration |
 | `--speculative-config` | `{"method":"dflash","num_speculative_tokens":15,...}` | 15 draft tokens per verification step |
 | `--load-format` | `fastsafetensors` | Zero-copy mmap loading, drops container init to <60s |
 | `--attention-backend` | `triton_attn` | Blackwell GB10 optimized Triton attention kernel |
@@ -201,7 +201,7 @@ docker run -d \
   --load-format fastsafetensors \
   --attention-backend triton_attn \
   --enable-chunked-prefill \
-  --speculative-config '{"method":"dflash","num_speculative_tokens": 15, "model": "Inferact/Muse-Glimmer-dflash"}' \
+  --speculative-config '{"method":"dflash","num_speculative_tokens": 15, "model": "meta-models/Muse-Glimmer-30B-assistant"}' \
   --enable-auto-tool-choice \
   --tool-call-parser muse_glimmer \
   --reasoning-parser muse_glimmer \

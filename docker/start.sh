@@ -8,7 +8,7 @@ set -euo pipefail
 
 CONTAINER="spark-brain"
 MODEL_ID="${MODEL_ID:-Inferact/Muse-Glimmer-30B-NVFP4-W4A4}"
-DFLASH_MODEL_ID="${DFLASH_MODEL_ID:-Inferact/Muse-Glimmer-dflash}"
+DFLASH_MODEL_ID="${DFLASH_MODEL_ID:-meta-models/Muse-Glimmer-30B-assistant}"
 ENABLE_DFLASH="${ENABLE_DFLASH:-1}"
 NUM_SPEC_TOKENS="${NUM_SPEC_TOKENS:-15}"
 SERVED_NAME="${SERVED_NAME:-Cogni-Brain}"
