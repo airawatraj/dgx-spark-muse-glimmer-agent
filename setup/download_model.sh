@@ -39,17 +39,27 @@ download_repo() {
   fi
 
   echo "  Downloading $repo_id to $target_dir..."
-  if command -v huggingface-cli &>/dev/null; then
-    huggingface-cli download "$repo_id" \
+  if command -v hf &>/dev/null; then
+    echo "  Using hf CLI..."
+    hf download "$repo_id" \
       --local-dir "$target_dir" \
       --token "$HF_TOKEN"
   elif command -v uv &>/dev/null; then
-    echo "  Using isolated uv tool run for huggingface-cli..."
-    uv tool run --from huggingface_hub huggingface-cli download "$repo_id" \
+    echo "  Using isolated uv snapshot_download..."
+    uv run --with huggingface_hub python3 -c "
+from huggingface_hub import snapshot_download
+import os
+snapshot_download(
+    repo_id='$repo_id',
+    local_dir='$target_dir',
+    token=os.environ.get('HF_TOKEN'),
+)
+"
+  elif command -v huggingface-cli &>/dev/null; then
+    huggingface-cli download "$repo_id" \
       --local-dir "$target_dir" \
       --token "$HF_TOKEN"
   else
-    echo "  huggingface-cli not found — using Python huggingface_hub..."
     python3 -c "
 from huggingface_hub import snapshot_download
 import os
