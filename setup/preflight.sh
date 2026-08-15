@@ -195,7 +195,7 @@ fi
 # ── 10. vLLM flag compatibility ───────────────────────────────────────────────
 header "10 / vLLM Engine Flags (dry-run)"
 
-VLLM_HELP=$(docker run --rm --gpus all "$IMAGE" --help 2>/dev/null || echo "")
+VLLM_HELP=$(docker run --rm --gpus all --entrypoint python3 "$IMAGE" -m vllm.entrypoints.openai.api_server --help 2>/dev/null || echo "")
 if echo "$VLLM_HELP" | grep -q "speculative-config"; then
   pass "--speculative-config supported (DFlash enabled)"
 else
