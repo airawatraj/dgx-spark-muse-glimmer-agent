@@ -74,11 +74,11 @@
 
 | Metric | Baseline (Stock vLLM) | **With DFlash ($K=16$ + NVFP4 CUTLASS)** | Delta |
 |---|---|---|---|
-| **Average TPS (single session)** | 19.7 tok/s | **27.2 tok/s** | **+38.1%** |
-| **Peak TPS (single session)** | 22.1 tok/s | **27.8 tok/s** | **+25.8%** |
-| **Steady-State TTFT** | 21,662 ms | **11,326 ms** | **1.9× faster** |
-| **Short Output (600 tok)** | 29.9 tok/s | **50.6 tok/s** | **+69.2%** |
-| **Concurrent (4 sessions)** | 45.7 tok/s | **66.5 tok/s** | **+45.5%** |
+| **Average TPS (single session)** | 19.7 tok/s | **27.5 tok/s** | **+39.6%** |
+| **Peak TPS (single session)** | 22.1 tok/s | **29.7 tok/s** | **+34.4%** |
+| **Steady-State TTFT** | 21,662 ms | **10,262 ms** | **2.1× faster** |
+| **Short Output (600 tok)** | 29.9 tok/s | **52.6 tok/s** | **+75.9%** |
+| **Concurrent (4 sessions)** | 45.7 tok/s | **68.8 tok/s** | **+50.5%** |
 | **KV Cache Capacity** | ~340,442 tokens | **2,220,470 tokens** | **6.5× headroom** |
 | **Max Working Context** | ~130,753 tokens | **~130,753 tokens** | Full 128K verified |
 

@@ -128,17 +128,17 @@ uv run benchmark/benchmark_speed_arena.py \
 
 | Test | Metric | Result (DFlash $K=16$) | Baseline Delta |
 |---|---|---|---|
-| Single session TPS | Average TPS | **27.2 tok/s** | **+38.1%** *(vs 19.7 tok/s)* |
-| Single session TPS | Peak TPS | **27.8 tok/s** | **+25.8%** *(vs 22.1 tok/s)* |
-| Single session latency | Avg TTFT (steady state) | **11,326 ms** | **1.9× faster** *(vs 21,662 ms)* |
-| Output length sweep — 600 tok | TPS | **50.6 tok/s** | **+69.2%** *(vs 29.9 tok/s)* |
-| Output length sweep — 1200 tok | TPS | **27.1 tok/s** | **+46.5%** *(vs 18.5 tok/s)* |
-| Concurrent — 2 sessions | Total TPS | **30.4 tok/s** | **+31.0%** *(vs 23.2 tok/s)* |
-| Concurrent — 4 sessions | Total TPS | **66.5 tok/s** | **+45.5%** *(vs 45.7 tok/s)* |
+| Single session TPS | Average TPS | **27.5 tok/s** | **+39.6%** *(vs 19.7 tok/s)* |
+| Single session TPS | Peak TPS | **29.7 tok/s** | **+34.4%** *(vs 22.1 tok/s)* |
+| Single session latency | Avg TTFT (steady state) | **10,262 ms** | **2.1× faster** *(vs 21,662 ms)* |
+| Output length sweep — 600 tok | TPS | **52.6 tok/s** | **+75.9%** *(vs 29.9 tok/s)* |
+| Output length sweep — 1200 tok | TPS | **27.5 tok/s** | **+48.6%** *(vs 18.5 tok/s)* |
+| Concurrent — 2 sessions | Total TPS | **31.1 tok/s** | **+34.1%** *(vs 23.2 tok/s)* |
+| Concurrent — 4 sessions | Total TPS | **68.8 tok/s** | **+50.5%** *(vs 45.7 tok/s)* |
 | GPU KV Cache Capacity | KV Block pool | **2,220,470 tokens (25.2 GiB)** | **6.5× headroom** *(vs 340K tok)* |
 | Context window — max tested | Working context | **~130,753 tokens ✓** | Full 128K verified |
 
-> **Note on TPS:** Muse-Glimmer runs with native thinking/reasoning traces. TTFT reflects the internal reasoning phase. With DFlash parallel verification active, steady-state response latency is halved and decode throughput reaches up to **50.6+ tok/s**.
+> **Note on TPS:** Muse-Glimmer runs with native thinking/reasoning traces. TTFT reflects the internal reasoning phase. With DFlash parallel verification active, steady-state response latency is halved and decode throughput reaches up to **52.6+ tok/s**.
 >
 > 📖 *For complete technical root-cause logs, container compatibility patches, and historical unspeculated baseline numbers, see [METHODOLOGY.md](METHODOLOGY.md).*
 
