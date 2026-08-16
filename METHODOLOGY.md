@@ -94,3 +94,35 @@
 - **Restraint & Refusal**: **100% (6/6)**.
 - **Error Recovery**: **83% (5/6)** (TC-14 recovered gracefully).
 - **Median Turn Latency**: **8.4s** (halved from 16.9s baseline).
+
+---
+
+## Historical Baseline Records (Stock vLLM without Speculation)
+
+Prior to implementing DFlash speculative decoding and FlashInfer CUTLASS NVFP4 kernels, the baseline unspeculated serving performance was:
+
+### Historical Speed Benchmark (Baseline)
+
+![Historical Baseline Speed Benchmark](assets/benchmark_speed.png)
+
+| Test | Metric | Result |
+|---|---|---|
+| Baseline TPS — single session | Average TPS | **19.7 tok/s** |
+| Baseline TPS — single session | Peak TPS | **22.1 tok/s** |
+| Baseline TPS — single session | Avg TTFT (steady state) | **21,662 ms** |
+| TPS vs output length — 600 tok | TPS | 29.9 tok/s |
+| TPS vs output length — 1200 tok | TPS | 18.5 tok/s |
+| Concurrent — 4 sessions | Total TPS | **45.7 tok/s** |
+| Context window — max tested | Working context | **~130,753 tokens ✓** |
+
+### Historical Smarts Benchmark (Baseline)
+
+![Historical Baseline Smarts Scenarios](assets/benchmark_smarts_1.png)
+![Historical Baseline Smarts Score](assets/benchmark_smarts_2.png)
+
+| Metric | Baseline Score |
+|---|---|
+| Quality | **87 / 100** |
+| Responsiveness | **7 / 100** (median turn: 16.9s) |
+| Deployability | **63 / 100** (α=0.7) |
+| Passed Scenarios | 13 pass · 0 partial · 2 fail |
