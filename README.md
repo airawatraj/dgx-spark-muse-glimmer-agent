@@ -1,11 +1,12 @@
-# Running Cogni-Brain on DGX Spark · Muse-Glimmer-30B-NVFP4-W4A4
+# Running Cogni-Brain on DGX Spark · Muse-Glimmer-30B-NVFP4-W4A4 + DFlash
 
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white)
 ![Base Model](https://img.shields.io/badge/base%20model-Muse--Glimmer--30B--NVFP4--W4A4-cyan)
+![Speculative](https://img.shields.io/badge/speculative-DFlash%20(K%3D16)-purple)
 ![Runtime](https://img.shields.io/badge/runtime-vllm%2Fvllm--openai%3Amuse--glimmer-orange)
 ![Hardware](https://img.shields.io/badge/hardware-NVIDIA%20DGX%20Spark-brightgreen?logo=nvidia&logoColor=white)
 ![Context](https://img.shields.io/badge/context-128K-blue)
-![Tool Calling](https://img.shields.io/badge/tool--calling-muse__glimmer-green)
+![Tool Eval](https://img.shields.io/badge/tool--eval-90%2F100-success)
 ![Reasoning](https://img.shields.io/badge/reasoning-muse__glimmer-black)
 ![Quantization](https://img.shields.io/badge/quantization-NVFP4%20W4A4-purple)
 
