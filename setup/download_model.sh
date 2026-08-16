@@ -81,11 +81,27 @@ echo ""
 # 2. Download DFlash Speculative Drafter model (~3 GB)
 download_repo "$DFLASH_MODEL_ID" "$DFLASH_CACHE_DIR" "DFlash Speculative Drafter"
 
-# Normalize drafter architecture in config.json to DFlashDraftModel for vLLM compatibility
+# Normalize drafter architecture and sliding window in config.json for vLLM compatibility
 for cfg in $(find "$DFLASH_CACHE_DIR" -name "config.json" 2>/dev/null); do
-  if grep -q "MuseGlimmerAssistantModel" "$cfg" 2>/dev/null; then
-    sed -i 's/"MuseGlimmerAssistantModel"/"DFlashDraftModel"/g' "$cfg" 2>/dev/null || true
-  fi
+  python3 -c "
+import json
+p = '$cfg'
+try:
+    with open(p, 'r') as f:
+        d = json.load(f)
+    changed = False
+    if 'MuseGlimmerAssistantModel' in d.get('architectures', []):
+        d['architectures'] = ['DFlashDraftModel']
+        changed = True
+    if d.get('sliding_window') is None:
+        d['sliding_window'] = 4096
+        changed = True
+    if changed:
+        with open(p, 'w') as f:
+            json.dump(d, f, indent=2)
+except Exception:
+    pass
+" 2>/dev/null || true
 done
 
 echo ""
