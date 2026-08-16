@@ -51,6 +51,12 @@ if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q "^${CONTAINER}$"; th
   echo "  Removed."
 fi
 
+# ── Reclaim OS page cache / memory ───────────────────────────────────────────
+echo "Reclaiming host page cache and buffers..."
+sudo sync || true
+sudo sysctl -w vm.drop_caches=3 >/dev/null 2>&1 || echo 3 | sudo tee /proc/sys/vm/drop_caches >/dev/null 2>&1 || true
+echo "  Page cache: dropped ✓"
+
 echo ""
 echo "    Model:           $MODEL_ID"
 echo "    Alias:           $SERVED_NAME"

@@ -11,6 +11,14 @@ if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q "^${CONTAINER}$"; th
   echo "Stopping and removing $CONTAINER..."
   docker rm -f "$CONTAINER" 2>/dev/null || true
   echo "✓ $CONTAINER removed."
+  echo "Reclaiming host page cache and buffers..."
+  sudo sync || true
+  sudo sysctl -w vm.drop_caches=3 >/dev/null 2>&1 || echo 3 | sudo tee /proc/sys/vm/drop_caches >/dev/null 2>&1 || true
+  echo "✓ Memory cache reclaimed."
 else
-  echo "$CONTAINER is not running — nothing to do."
+  echo "$CONTAINER is not running."
+  echo "Reclaiming host page cache and buffers..."
+  sudo sync || true
+  sudo sysctl -w vm.drop_caches=3 >/dev/null 2>&1 || echo 3 | sudo tee /proc/sys/vm/drop_caches >/dev/null 2>&1 || true
+  echo "✓ Memory cache reclaimed."
 fi
