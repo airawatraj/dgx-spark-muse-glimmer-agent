@@ -104,7 +104,7 @@ def main():
         "--depth",
         nargs="+",
         default=["0", "4096", "8192", "16384", "32768", "65535", "128896"],
-        help="Context depths to test. 128896 + 2048(pp) + 128(tg) = 131072 (exact 100% full 128K context)",
+        help="Context depths to test. 128896 + 2048(pp) + 128(tg) = 131072 (exact full 128K context)",
     )
     parser.add_argument(
         "--concurrency",
