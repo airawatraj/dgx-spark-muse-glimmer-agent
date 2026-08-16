@@ -70,6 +70,8 @@
 
 ### 1. Speed Benchmark (`benchmark_speed.py`)
 
+![Speed benchmark results with DFlash Speculative Decoding](assets/benchmark_speed_dflash.png)
+
 | Metric | Baseline | **With DFlash ($K=15$)** | Delta |
 |---|---|---|---|
 | **Average TPS (single session)** | 19.7 tok/s | **27.1 tok/s** | **+37.6%** |
@@ -81,8 +83,11 @@
 
 ### 2. Smarts Benchmark (`benchmark_smarts.py`)
 
+![Smarts benchmark scenarios with DFlash](assets/benchmark_smarts_dflash_1.png)
+![Smarts benchmark category breakdown and final score with DFlash](assets/benchmark_smarts_dflash_2.png)
+
 - **Median Turn Latency**: Dropped from **16.9s down to 7.9s** (**2.1× faster per turn**).
 - **Responsiveness Score**: Increased from **7/100 to 19/100**.
 - **Multi-Step Chains**: **100% (6/6)**.
 - **Restraint & Refusal**: **100% (6/6)**.
-- **Overall Quality Score**: **80/100** (24/30 pts).
+- **Overall Quality Score**: **80/100** (24/30 pts across 15 scenarios).
