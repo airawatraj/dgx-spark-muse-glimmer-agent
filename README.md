@@ -1,45 +1,33 @@
-# Running Cogni-Brain on DGX Spark · Muse-Glimmer-30B + DFlash Speculative Decoding
+# Running Cogni-Brain on DGX Spark · Muse-Glimmer-30B-NVFP4-W4A4
 
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white)
 ![Base Model](https://img.shields.io/badge/base%20model-Muse--Glimmer--30B--NVFP4--W4A4-cyan)
-![Drafter](https://img.shields.io/badge/drafter-DFlash--Speculative--Decoding-magenta)
 ![Runtime](https://img.shields.io/badge/runtime-vllm%2Fvllm--openai%3Amuse--glimmer-orange)
 ![Hardware](https://img.shields.io/badge/hardware-NVIDIA%20DGX%20Spark-brightgreen?logo=nvidia&logoColor=white)
 ![Context](https://img.shields.io/badge/context-128K-blue)
 ![Tool Calling](https://img.shields.io/badge/tool--calling-muse__glimmer-green)
 ![Reasoning](https://img.shields.io/badge/reasoning-muse__glimmer-black)
 ![Quantization](https://img.shields.io/badge/quantization-NVFP4%20W4A4-purple)
+![Speculative Decoding](https://img.shields.io/badge/speculative-DFlash%20K%3D15-yellow)
 
-This repository contains the production-grade DGX Spark inference configuration for [Inferact/Muse-Glimmer-30B-NVFP4-W4A4](https://huggingface.co/Inferact/Muse-Glimmer-30B-NVFP4-W4A4) paired with **DFlash Speculative Decoding**.
+This repo documents my inference tuning experiments of [Inferact/Muse-Glimmer-30B-NVFP4-W4A4](https://huggingface.co/Inferact/Muse-Glimmer-30B-NVFP4-W4A4) on a single DGX Spark.
 
 > ⚠️ **Personal workstation setup. Not for enterprise use. Use at your own risk.**
 
 ---
 
-## Why Muse-Glimmer 30B + DFlash on DGX Spark?
+## What is Muse-Glimmer?
 
-### 1. Solving the DGX Spark Memory Bandwidth Bottleneck
-On unified-memory hardware like the NVIDIA DGX Spark (Grace-Blackwell GB10 with 128 GB unified memory), autoregressive decoding for dense 30B models is bottlenecked by memory bandwidth rather than compute. Streaming 30B weights sequentially results in ~5–8 tok/s baseline.
+[Muse-Glimmer-30B-NVFP4-W4A4](https://huggingface.co/Inferact/Muse-Glimmer-30B-NVFP4-W4A4) is Inferact's 30B reasoning and tool-calling model, served here as **Cogni-Brain** — a model alias that stays consistent across agent frameworks (Claude Code, Continue, Open WebUI, etc.) regardless of which model is running underneath.
 
-**The DFlash Breakthrough:**
-By pairing the dense 30B model with a lightweight DFlash assistant drafter (`meta-models/Muse-Glimmer-30B-assistant`) with $K = 15$ speculative draft tokens:
-- The drafter proposes candidate tokens at high compute speeds.
-- The 30B model verifies the batch in a single forward pass, reading model weights once across multiple accepted tokens.
-- **Generation speed leaps from ~5–8 tok/s to 23+ tok/s** without losing 1 bit of target model intelligence or accuracy!
-
-```
-Standard Autoregressive (Dense 30B):
-[Token 1: Read 16GB] ──> [Token 2: Read 16GB] ──> [Token 3: Read 16GB]  (~5–8 tok/s)
-
-DFlash Speculative Decoding (Dense 30B + Drafter):
-[Draft 15 tokens fast] ──> [Single Batched 30B Verification: Read 16GB once] ──> (23+ tok/s)
-```
-
-### 2. Frontier Intelligence vs MoE / Omni Models
-According to the **Artificial Analysis Intelligence Index** and empirical agent benchmarks:
-- **Muse-Glimmer (high reasoning)** achieves an intelligence rating of **35**, outperforming Qwen 3.5 122B MoE (33), Qwen 3.6 35B MoE (32), Claude 4.5 Haiku (30), and Nemotron 3 Super (26).
-- **Zero Routing Degradation:** Unlike Mixture-of-Experts models that suffer expert drift over long multi-turn contexts, Muse-Glimmer's dense 30B parameters participate in every reasoning step.
-- **100% Tool Parameter Precision:** 100% precision on multi-step chains and parameter extraction via native `muse_glimmer` parsers.
+Key characteristics:
+- **NVFP4 W4A4 (Weight + Activation Quantization)** — Both weights and activations are quantized to FP4/INT4, targeting Grace-Blackwell Tensor Cores on the DGX Spark
+- **DFlash Speculative Acceleration** — Parallel draft head (`meta-models/Muse-Glimmer-30B-assistant`) with $K=15$ lookahead tokens for accelerated decoding
+- **muse_glimmer** tool-call and reasoning parsers (native, not adapted)
+- **128K token context window** (`--max-model-len 131072`)
+- Native `--enable-auto-tool-choice` support
+- `--generation-config auto` — model-native generation config (no manual override)
+- **30B parameter** dense model — significantly faster TPS than the 118B Laguna MoE
 
 ---
 
@@ -48,36 +36,39 @@ According to the **Artificial Analysis Intelligence Index** and empirical agent 
 > ⚠️ **Warning:** `setup/install.sh` disables system swap permanently to prevent unified-memory thrashing. This is a system-level change that survives reboots.
 
 ```bash
-# 1. Set your Hugging Face token
+# 1. Set your Hugging Face token (model may be gated)
 export HF_TOKEN="your_hf_token_here"
 
 # 2. System prerequisites (swap disable, uv install, docker check)
 bash setup/install.sh
 
-# 3. Download target model + DFlash drafter weights (~20 GB total)
+# 3. Download model weights (one-time, target + DFlash assistant)
 bash setup/download_model.sh
 
-# 4. Preflight check — validates GPU, memory, weights, Docker image, and DFlash flags
+# 4. Preflight check — validates GPU, swap, memory, Docker image, flag compat
 bash setup/preflight.sh
 
-# 5. Start vLLM container with DFlash speculative decoding
+# 5. Start vLLM container with NVFP4 W4A4 + DFlash Speculative Drafting
 bash docker/start.sh
 
-# 6. Check container status & speculative health
+# 6. Check container status & logs
 bash docker/status.sh
 
 # 7. Run benchmarks
 uv run benchmark/benchmark_speed.py
 uv run benchmark/benchmark_smarts.py
-# Overnight full sweep:
+# Optional: full spark-arena-style overnight sweep
 uv run benchmark/benchmark_speed_arena.py --save-result benchmark/results_full.csv
 ```
+
+> `benchmark_speed_arena.py` and `benchmark_smarts.py` fetch `llama-benchy` and
+> `tool-eval-bench` through `uv` on demand — no separate global install step required.
 
 ---
 
 ## Benchmarks
 
-### Speed Benchmark (`benchmark_speed.py`)
+### Speed Benchmark (custom script)
 
 ```bash
 # Full run (TPS, TTFT, concurrent sessions, context window)
@@ -91,12 +82,10 @@ uv run benchmark/benchmark_speed.py --skip-context --skip-concurrent
 uv run benchmark/benchmark_speed.py --host localhost --port 8000 --model Cogni-Brain
 ```
 
-> **Metrics Tracked:** Single-session TPS, peak TPS, TTFT under deep reasoning chains, concurrent session throughput (1–4 clients), and 128K context scaling.
-
-### Smarts Benchmark (`benchmark_smarts.py` · `tool-eval-bench`)
+### Smarts Benchmark (tool-eval-bench)
 
 ```bash
-# Quick smoke test (15 scenarios)
+# Quick smoke test (recommended first run)
 uv run benchmark/benchmark_smarts.py
 
 # Throughput sweep
@@ -106,109 +95,91 @@ uv run benchmark/benchmark_smarts.py --mode perf
 uv run benchmark/benchmark_smarts.py --mode trials --seed 42 --trials 3
 ```
 
-### Spark Arena Sweep (`benchmark_speed_arena.py` · `llama-benchy`)
+> Evaluates: tool selection, parameter precision, multi-step chains, refusal behaviour, error recovery.
+
+### spark-arena Benchmark (overnight, llama-benchy)
 
 ```bash
-# Standard spark-arena sweep (context depths up to 128K with prefix caching)
+# Standard spark-arena sweep (tests context depths up to 128K)
 uv run benchmark/benchmark_speed_arena.py --save-result benchmark/results_full.csv
+
+# Custom endpoint
+uv run benchmark/benchmark_speed_arena.py \
+  --base-url http://localhost:8000/v1 \
+  --model Inferact/Muse-Glimmer-30B-NVFP4-W4A4 \
+  --served-model-name Cogni-Brain \
+  --save-result benchmark/results_full.csv
 ```
+
+> This sweep tests concurrency 1, 2, 5, 10 at depth points from 0 to 131,072 tokens.
+> Plan for several hours; run overnight.
 
 ---
 
 ## Benchmark Results Summary
 
 > Benchmarks run on DGX Spark GB10 · August 2026  
-> Model: `Inferact/Muse-Glimmer-30B-NVFP4-W4A4` + `meta-models/Muse-Glimmer-30B-assistant`  
 > vLLM `v0.1.dev19075+gd89ec6d6a` · tool-eval-bench `v2.3.1.dev8+g7fa6dd70b`
 
 ### Speed Benchmark (`benchmark_speed.py`)
 
-| Test | Metric | Standard NVFP4 | NVFP4 + DFlash Speculative |
-|---|---|---|---|
-| Single Session Baseline | Average TPS | 8.2 tok/s | **22.4 tok/s** |
-| Single Session Baseline | Peak TPS | 11.5 tok/s | **24.8 tok/s** |
-| Output Length 600 tok | TPS | 12.1 tok/s | **29.9 tok/s** |
-| Concurrent — 2 sessions | Total TPS | 14.5 tok/s | **26.8 tok/s** |
-| Concurrent — 4 sessions | Total TPS | 22.0 tok/s | **48.2 tok/s** |
-| Context window | Max verified | **130,753 tokens ✓** | **130,753 tokens ✓** |
+![Speed benchmark results](assets/benchmark_speed.png)
 
-> **Note on TTFT & Reasoning:** Muse-Glimmer executes a deep internal `<thought>` chain before emitting answer tokens. Token calculations include both reasoning and content tokens.
+| Test | Metric | Result |
+|---|---|---|
+| Baseline TPS — single session | Average TPS | **19.7 tok/s** |
+| Baseline TPS — single session | Peak TPS | **22.1 tok/s** |
+| Baseline TPS — single session | Avg TTFT (steady state) | **21,662 ms** |
+| TPS vs output length — 600 tok | TPS | 29.9 tok/s |
+| TPS vs output length — 1200 tok | TPS | 18.5 tok/s |
+| TPS vs output length — 2500 tok | TPS | 15.1 tok/s |
+| Concurrent — 2 sessions | Total TPS | **23.2 tok/s** |
+| Concurrent — 4 sessions | Total TPS | **45.7 tok/s** |
+| Context window — max tested | Working context | **~130,753 tokens ✓** |
 
-### Smarts Benchmark (`tool-eval-bench` — 15 Scenarios)
+> **Note on TPS:** Muse-Glimmer runs in deep reasoning mode — the model completes a ~500-tok internal thinking chain before streaming any output. TTFT reflects the full reasoning phase. Token counts include both reasoning and content tokens. Peak context TPS at ~1K tokens reaches **230 tok/s**.
 
-| Category | Score | Result |
+### Smarts Benchmark (`benchmark_smarts.py` — Quick smoke test, 15 scenarios)
+
+![Smarts benchmark — scenario results](assets/benchmark_smarts_1.png)
+![Smarts benchmark — category breakdown and final score](assets/benchmark_smarts_2.png)
+
+| Category | Score | Earned |
 |---|---|---|
 | Tool Selection | 67% | 4/6 |
 | Parameter Precision | **100%** | 6/6 |
 | Multi-Step Chains | **100%** | 6/6 |
 | Restraint & Refusal | **100%** | 6/6 |
 | Error Recovery | 67% | 4/6 |
-| **Overall Quality** | **87 / 100** | **13 pass · 0 partial · 2 fail** |
+| **Overall** | **87 / 100** | 13 pass · 0 partial · 2 fail |
 
----
+| Metric | Score |
+|---|---|
+| Quality | **87/100** |
+| Responsiveness | 7/100 *(median turn: 16.9s — deep reasoning overhead)* |
+| Deployability | **63/100** *(α=0.7)* |
+| Weakest category | Tool Selection (67%) |
+| Token efficiency | 58,742 tokens · 0.4 pts/1K tok |
 
-## Hardware & Architecture
+> **Responsiveness score** (7/100) is purely a latency penalty from the logistic curve used by tool-eval-bench (100 at <1s, ~50 at 3s, 0 at >10s). At a median 16.9s/turn driven by deep reasoning, this is expected. Quality score of 87/100 is the meaningful deployment signal.
 
-- **NVIDIA DGX Spark Mini PC** (GB10 Grace-Blackwell Superchip)
-- **128 GB Unified Memory** (CPU + GPU shared)
-- **NVFP4 W4A4 Quantization** — Weights and activations quantized to 4-bit, executed on Grace-Blackwell Tensor Cores
-- **DFlash Drafter Assistant** — Speculative drafting eliminating memory bandwidth stalls
-- **Native Parsers** — Zero regex overhead with `muse_glimmer` tool-call and reasoning parsers
-- **128K Context Window** (`--max-model-len 131072`)
 
----
+### Spark Arena / llama-benchy (community benchmark)
 
-## Key Configuration Reference
+![Spark Arena Benchmark Results](assets/spark_arena_muse-glimmer-30b.png)
 
-| Parameter | Value | Technical Rationale |
-|---|---|---|
-| Target Model | `Inferact/Muse-Glimmer-30B-NVFP4-W4A4` | Dense 30B reasoning model with NVFP4 weights + activations |
-| Drafter Model | `meta-models/Muse-Glimmer-30B-assistant` | Speculative assistant model for DFlash acceleration |
-| `--speculative-config` | `{"method":"dflash","num_speculative_tokens":15,...}` | 15 draft tokens per verification step |
-| `--load-format` | `fastsafetensors` | Zero-copy mmap loading, drops container init to <60s |
-| `--attention-backend` | `triton_attn` | Blackwell GB10 optimized Triton attention kernel |
-| `--enable-chunked-prefill` | on | Prevents TTFT spikes during concurrent multi-turn requests |
-| `--gpu-memory-utilization` | `0.92` | Optimal VRAM allocation on 128 GB DGX Spark |
-| `--kv-cache-dtype` | `fp8` | Native Blackwell FP8 KV cache (~25% memory savings) |
-| `--kv-cache-memory-bytes` | `4147483648` | Dedicated 4 GB KV pool boundary |
-| `--max-num-batched-tokens` | `8196` | High throughput batching threshold |
-| `--max-model-len` | `131072` | Full 128K context window |
-| `--override-generation-config` | `{"temperature": 0.7, "top_p": 0.8, "top_k": 20, ...}` | Balances creative reasoning with deterministic tool payload schema |
-| `--disable-log-stats` | on | Removes Prometheus polling locks from hot inference loop |
-
----
-
-## Raw Docker Command (Reference)
-
-```bash
-docker run -d \
-  --name spark-brain \
-  --gpus all \
-  --shm-size=16gb \
-  -e HF_TOKEN=$HF_TOKEN \
-  -v ~/.cache/huggingface:/root/.cache/huggingface \
-  -p 8000:8000 \
-  vllm/vllm-openai:muse-glimmer \
-  Inferact/Muse-Glimmer-30B-NVFP4-W4A4 \
-  --served-model-name Cogni-Brain \
-  --tensor-parallel-size 1 \
-  --max-model-len 131072 \
-  --gpu-memory-utilization 0.92 \
-  --kv-cache-dtype fp8 \
-  --kv-cache-memory-bytes 4147483648 \
-  --max-num-batched-tokens 8196 \
-  --max-num-seqs 8 \
-  --load-format fastsafetensors \
-  --attention-backend triton_attn \
-  --enable-chunked-prefill \
-  --speculative-config '{"method":"dflash","num_speculative_tokens": 15, "model": "meta-models/Muse-Glimmer-30B-assistant"}' \
-  --enable-auto-tool-choice \
-  --tool-call-parser muse_glimmer \
-  --reasoning-parser muse_glimmer \
-  --generation-config auto \
-  --override-generation-config '{"temperature": 0.7, "top_p": 0.8, "top_k": 20, "presence_penalty": 0.0, "repetition_penalty": 1.0}' \
-  --disable-log-stats
-```
+| Metric | Spark Arena Result |
+|---|---|
+| Run Link | [spark-arena.com/benchmark/ec3851cb-e755-4522-a3bf-f1806cbdd14f](https://spark-arena.com/benchmark/ec3851cb-e755-4522-a3bf-f1806cbdd14f) |
+| Run author | Rajendra Rawat |
+| Model | Inferact/Muse-Glimmer-30B-NVFP4-W4A4 |
+| Runtime | vLLM (vllm/vllm-openai:muse-glimmer) |
+| Tensor parallel | 1 |
+| Nodes | 1 |
+| `--max-model-len` | 131,072 |
+| Context depths tested | 0, 4K, 8K, 16K, 32K, 64K, 128K |
+| Concurrency sweep | 1, 2, 5, 10 |
+| Data points | 28 |
 
 ---
 
@@ -221,18 +192,104 @@ dgx-spark-muse-glimmer-agent/
 ├── CITATION.cff                  ← citation metadata
 ├── setup/
 │   ├── install.sh                ← prerequisites, swap disable, uv install
-│   ├── download_model.sh         ← fetch target NVFP4 model & DFlash drafter weights
-│   └── preflight.sh              ← pre-inference system, memory, and flag validation
+│   ├── download_model.sh         ← fetch target and DFlash drafter weights
+│   └── preflight.sh              ← hardware & configuration verification
 ├── docker/
-│   ├── start.sh                  ← launch spark-brain with DFlash & GB10 tuning
+│   ├── start.sh                  ← launch spark-brain via plain docker run
 │   ├── stop.sh                   ← stop and remove container
-│   └── status.sh                 ← check container, speculative status, KV cache, VmSwap
-└── benchmark/
-    ├── benchmark_speed.py        ← TPS, TTFT, context-window benchmark
-    ├── benchmark_speed_arena.py  ← overnight spark-arena llama-benchy sweep
-    └── benchmark_smarts.py       ← tool-eval-bench capability benchmark
+│   ├── status.sh                 ← health check, memory, VmSwap, KV cache
+│   └── entrypoint.py             ← container bootstrap wrapper
+├── benchmark/
+│   ├── benchmark_speed.py        ← TPS, TTFT, context-window benchmark
+│   ├── benchmark_speed_arena.py  ← overnight spark-arena-style llama-benchy sweep
+│   └── benchmark_smarts.py       ← tool-eval-bench capability benchmark
+└── assets/                       ← screenshots and benchmark artifacts
 ```
 
 ---
+
+## Hardware & Architecture
+
+- **NVIDIA DGX Spark Mini PC** (GB10 Grace-Blackwell Superchip, sm_121a)
+- **128 GB unified memory** (CPU + GPU shared)
+- **NVFP4 W4A4 Quantisation** — Both weights and activations quantized, enabling maximum throughput on Blackwell Tensor Cores
+- **DFlash Speculative Drafting** — Parallel drafting assistant with $K=15$ speculative lookahead tokens
+- **30B dense model** — Lower memory footprint than MoE alternatives; fits comfortably in DGX Spark unified memory
+- Tool-calling and reasoning via native `muse_glimmer` parsers
+- `--generation-config auto` — uses model-embedded generation config for optimal quality/speed
+
+---
+
+## Key Configuration Notes
+
+| Parameter | Value | Reason |
+|---|---|---|
+| Model | `Inferact/Muse-Glimmer-30B-NVFP4-W4A4` | Native NVFP4 W4A4 quantized model |
+| Drafter Model | `meta-models/Muse-Glimmer-30B-assistant` | DFlash parallel speculative drafter ($K=15$) |
+| Docker image | `vllm/vllm-openai:muse-glimmer` | Muse-Glimmer specific vLLM build |
+| `--tensor-parallel-size` | `1` | Single DGX Spark (single GPU domain) |
+| `--max-model-len` | `131072` | Full 128K native context window |
+| `--max-num-seqs` | `8` | Reduces KV memory fragmentation under batching |
+| `--gpu-memory-utilization` | `0.92` | KV cache headroom in 128 GB unified memory |
+| `--kv-cache-dtype` | `fp8` | Native GB10 FP8 KV cache — ~15–25% TPS gain |
+| `--load-format` | `fastsafetensors` | Accelerated mmap weight loading |
+| `--attention-backend` | `triton_attn` | Optimized sm_121a attention kernel |
+| `--enable-chunked-prefill` | `true` | Prevents TTFT spikes on long context prompts |
+| `--disable-log-stats` | on | Removes metric collection overhead during inference |
+| `--enable-auto-tool-choice` | on | Automatic tool call mode detection |
+| `--tool-call-parser` | `muse_glimmer` | Native Muse-Glimmer tool parser |
+| `--reasoning-parser` | `muse_glimmer` | Native thinking-token parser |
+| Container name | `spark-brain` | Distinguishes from other models on same host |
+| Served model alias | `Cogni-Brain` | Single framework-agnostic agent name |
+
+---
+
+## Raw Docker Command (Reference)
+
+The exact command this repo wraps in `docker/start.sh`:
+
+```bash
+docker run -d \
+  --name spark-brain \
+  --gpus all \
+  --shm-size=16gb \
+  -e HF_TOKEN=$HF_TOKEN \
+  -v ~/.cache/huggingface:/root/.cache/huggingface \
+  -v $(pwd)/docker/entrypoint.py:/entrypoint.py \
+  -p 8000:8000 \
+  --entrypoint python3 \
+  vllm/vllm-openai:muse-glimmer \
+  /entrypoint.py \
+  Inferact/Muse-Glimmer-30B-NVFP4-W4A4 \
+  --served-model-name Cogni-Brain \
+  --tensor-parallel-size 1 \
+  --max-model-len 131072 \
+  --gpu-memory-utilization 0.92 \
+  --kv-cache-dtype fp8 \
+  --max-num-seqs 8 \
+  --load-format fastsafetensors \
+  --attention-backend triton_attn \
+  --enable-chunked-prefill \
+  --enable-auto-tool-choice \
+  --tool-call-parser muse_glimmer \
+  --reasoning-parser muse_glimmer \
+  --speculative-config '{"method":"dflash","num_speculative_tokens":15,"model":"meta-models/Muse-Glimmer-30B-assistant"}' \
+  --generation-config auto \
+  --disable-log-stats
+```
+
+---
+
+## Known Limitations
+
+- Uses the `vllm/vllm-openai:muse-glimmer` Docker image — a model-specific vLLM build; not a generic stable release
+- `--served-model-name Cogni-Brain` — single alias; resolves consistently across agent frameworks
+- W4A4 quantization trades a small amount of quality for significant throughput gains; evaluate on your target tasks
+
+---
+
+## Feedback Welcome
+
+If you reproduce these results, find an error, or achieve higher numbers, please open an issue or PR. The goal is accurate community benchmarks.
 
 **Author:** Rajendra Rawat · August 2026
