@@ -21,6 +21,10 @@ MAX_NUM_SEQS="${MAX_NUM_SEQS:-4}"
 # ── Preflight checks ──────────────────────────────────────────────────────────
 echo "=== spark-brain preflight ==="
 
+if [[ -z "${HF_TOKEN:-}" && -f "$HOME/.cache/huggingface/token" ]]; then
+  HF_TOKEN="$(cat "$HOME/.cache/huggingface/token")"
+fi
+
 if [[ -z "${HF_TOKEN:-}" ]]; then
   echo "ERROR: HF_TOKEN environment variable is not set."
   echo "       Set it using: export HF_TOKEN='your_token'"
