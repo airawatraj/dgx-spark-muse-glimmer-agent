@@ -98,22 +98,23 @@ uv run benchmark/benchmark_smarts.py --mode trials --seed 42 --trials 3
 
 > Evaluates: tool selection, parameter precision, multi-step chains, refusal behaviour, error recovery.
 
-### spark-arena Benchmark (overnight, llama-benchy)
+### spark-arena Benchmark (llama-benchy)
 
 ```bash
-# Standard spark-arena sweep (tests context depths up to 128K)
+# 1. Quick 60-second smoke test (verifies ONLY the max 128K context point)
+uv run benchmark/benchmark_speed_arena.py --verify-128k
+
+# 2. Standard spark-arena full overnight sweep (tests depths 0 to 128K across concurrencies 1, 2, 5, 10)
 uv run benchmark/benchmark_speed_arena.py --save-result benchmark/results_full.csv
 
-# Custom endpoint
+# 3. Custom endpoint or single depth
 uv run benchmark/benchmark_speed_arena.py \
   --base-url http://localhost:8000/v1 \
-  --model Inferact/Muse-Glimmer-30B-NVFP4-W4A4 \
-  --served-model-name Cogni-Brain \
-  --save-result benchmark/results_full.csv
+  --depth 128896 \
+  --concurrency 1
 ```
 
-> This sweep tests concurrency 1, 2, 5, 10 at depth points from 0 to 131,072 tokens.
-> Plan for several hours; run overnight.
+> **Depth Math:** `--depth 128896` + `--pp 2048` + `--tg 128` = **131,072 tokens** (100.0% exact native 128K context window). Full overnight sweep takes several hours; run in `tmux`.
 
 ---
 
@@ -227,7 +228,7 @@ dgx-spark-muse-glimmer-agent/
 | Assistant Drafter | `meta-models/Muse-Glimmer-30B-assistant` | DFlash parallel speculative drafter ($K=16$) |
 | Docker image | `vllm/vllm-openai:muse-glimmer` | Muse-Glimmer specific vLLM build |
 | `--tensor-parallel-size` | `1` | Single DGX Spark (single GPU domain) |
-| `--max-model-len` | `135168` | 132K sequence capacity accommodating full 128K prefill + generation |
+| `--max-model-len` | `131072` | Full 128K native context window |
 | `--gpu-memory-utilization` | `0.65` | Allocates ~25.2 GB for 2.22M FP8 KV cache tokens while keeping host UMA unconstrained |
 | `--kv-cache-dtype` | `fp8` | Native GB10 FP8 KV cache |
 | `--language-model-only` | enabled | Eliminates vision encoder overhead for pure LLM/agent serving |
@@ -269,7 +270,7 @@ docker run -d \
   Inferact/Muse-Glimmer-30B-NVFP4-W4A4 \
   --served-model-name Cogni-Brain \
   --tensor-parallel-size 1 \
-  --max-model-len 135168 \
+  --max-model-len 131072 \
   --gpu-memory-utilization 0.65 \
   --kv-cache-dtype fp8 \
   --max-num-batched-tokens 8192 \

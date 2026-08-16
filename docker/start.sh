@@ -15,7 +15,7 @@ SERVED_NAME="${SERVED_NAME:-Cogni-Brain}"
 PORT="${PORT:-8000}"
 GPU_MEM_UTIL="${GPU_MEM_UTIL:-0.65}"
 MAX_BATCHED_TOKENS="${MAX_BATCHED_TOKENS:-8192}"
-MAX_MODEL_LEN="${MAX_MODEL_LEN:-135168}"
+MAX_MODEL_LEN="${MAX_MODEL_LEN:-131072}"
 MAX_NUM_SEQS="${MAX_NUM_SEQS:-4}"
 
 # ── Preflight checks ──────────────────────────────────────────────────────────

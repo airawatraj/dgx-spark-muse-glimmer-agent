@@ -46,7 +46,14 @@ def result_line(label, value, color="green"):
 
 
 def build_command(args):
-    return [
+    depths = args.depth
+    concurrencies = args.concurrency
+
+    if args.verify_128k:
+        depths = ["128896"]
+        concurrencies = ["1"]
+
+    cmd = [
         "uv",
         "tool",
         "run",
@@ -62,27 +69,18 @@ def build_command(args):
         "--tokenizer",
         args.tokenizer,
         "--depth",
-        "0",
-        "4096",
-        "8192",
-        "16384",
-        "32768",
-        "65535",
-        "131072",
-        # Note: depths beyond 131072 will fail unless --max-model-len is raised
+        *depths,
         "--pp",
         str(args.pp),
         "--tg",
         str(args.tg),
         "--enable-prefix-caching",
         "--concurrency",
-        "1",
-        "2",
-        "5",
-        "10",
+        *concurrencies,
         "--save-result",
         args.save_result,
     ]
+    return cmd
 
 
 def main():
@@ -102,6 +100,23 @@ def main():
     )
     parser.add_argument("--pp", type=int, default=2048)
     parser.add_argument("--tg", type=int, default=128)
+    parser.add_argument(
+        "--depth",
+        nargs="+",
+        default=["0", "4096", "8192", "16384", "32768", "65535", "128896"],
+        help="Context depths to test. 128896 + 2048(pp) + 128(tg) = 131072 (exact 100% full 128K context)",
+    )
+    parser.add_argument(
+        "--concurrency",
+        nargs="+",
+        default=["1", "2", "5", "10"],
+        help="Concurrency levels to test",
+    )
+    parser.add_argument(
+        "--verify-128k",
+        action="store_true",
+        help="Run a 60-second quick smoke test of ONLY the maximum 128K context point (depth=128896, concurrency=1)",
+    )
     parser.add_argument("--save-result", default="results_full.csv")
     args = parser.parse_args()
 
@@ -111,6 +126,7 @@ def main():
     result_line("Model", args.model)
     result_line("Served model name", args.served_model_name)
     result_line("Tokenizer", args.tokenizer)
+    result_line("Depths", " ".join(args.depth) if not args.verify_128k else "128896 (Quick 128K Verify)")
     result_line("Output CSV", args.save_result)
     print()
     print(f"  {c('This sweep tests depths up to 128K context. Prefer to run it overnight.', 'yellow')}")
