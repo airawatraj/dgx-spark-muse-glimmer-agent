@@ -227,7 +227,7 @@ dgx-spark-muse-glimmer-agent/
 | Assistant Drafter | `meta-models/Muse-Glimmer-30B-assistant` | DFlash parallel speculative drafter ($K=16$) |
 | Docker image | `vllm/vllm-openai:muse-glimmer` | Muse-Glimmer specific vLLM build |
 | `--tensor-parallel-size` | `1` | Single DGX Spark (single GPU domain) |
-| `--max-model-len` | `131072` | Full 128K native context window |
+| `--max-model-len` | `135168` | 132K sequence capacity accommodating full 128K prefill + generation |
 | `--gpu-memory-utilization` | `0.65` | Allocates ~25.2 GB for 2.22M FP8 KV cache tokens while keeping host UMA unconstrained |
 | `--kv-cache-dtype` | `fp8` | Native GB10 FP8 KV cache |
 | `--language-model-only` | enabled | Eliminates vision encoder overhead for pure LLM/agent serving |
@@ -254,6 +254,7 @@ docker run -d \
   --gpus all \
   --shm-size=16gb \
   -e HF_TOKEN=$HF_TOKEN \
+  -e VLLM_ALLOW_LONG_MAX_MODEL_LEN=1 \
   -e VLLM_MARLIN_USE_ATOMIC_ADD=1 \
   -e TORCH_MATMUL_PRECISION=high \
   -e FLASHINFER_DISABLE_VERSION_CHECK=1 \
@@ -268,7 +269,7 @@ docker run -d \
   Inferact/Muse-Glimmer-30B-NVFP4-W4A4 \
   --served-model-name Cogni-Brain \
   --tensor-parallel-size 1 \
-  --max-model-len 131072 \
+  --max-model-len 135168 \
   --gpu-memory-utilization 0.65 \
   --kv-cache-dtype fp8 \
   --max-num-batched-tokens 8192 \

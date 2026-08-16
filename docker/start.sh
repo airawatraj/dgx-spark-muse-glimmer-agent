@@ -15,7 +15,7 @@ SERVED_NAME="${SERVED_NAME:-Cogni-Brain}"
 PORT="${PORT:-8000}"
 GPU_MEM_UTIL="${GPU_MEM_UTIL:-0.65}"
 MAX_BATCHED_TOKENS="${MAX_BATCHED_TOKENS:-8192}"
-MAX_MODEL_LEN="${MAX_MODEL_LEN:-131072}"
+MAX_MODEL_LEN="${MAX_MODEL_LEN:-135168}"
 MAX_NUM_SEQS="${MAX_NUM_SEQS:-4}"
 
 # ── Preflight checks ──────────────────────────────────────────────────────────
@@ -105,6 +105,7 @@ docker run -d \
   --gpus all \
   --shm-size=16gb \
   -e HF_TOKEN="$HF_TOKEN" \
+  -e VLLM_ALLOW_LONG_MAX_MODEL_LEN=1 \
   -e VLLM_MARLIN_USE_ATOMIC_ADD=1 \
   -e TORCH_MATMUL_PRECISION=high \
   -e FLASHINFER_DISABLE_VERSION_CHECK=1 \
