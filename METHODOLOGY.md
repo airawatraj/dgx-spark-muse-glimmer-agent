@@ -72,13 +72,14 @@
 
 ![Speed benchmark results with DFlash Speculative Decoding](assets/benchmark_speed_dflash.png)
 
-| Metric | Baseline | **With DFlash ($K=15$)** | Delta |
+| Metric | Baseline (Stock vLLM) | **With DFlash ($K=16$ + NVFP4 CUTLASS)** | Delta |
 |---|---|---|---|
-| **Average TPS (single session)** | 19.7 tok/s | **27.1 tok/s** | **+37.6%** |
-| **Peak TPS (single session)** | 22.1 tok/s | **27.9 tok/s** | **+26.2%** |
-| **Steady-State TTFT** | 21,662 ms | **10,301 ms** | **2.1× faster** |
-| **Short Output (600 tok)** | 29.9 tok/s | **53.6 tok/s** | **+79.3%** |
-| **Concurrent (4 sessions)** | 45.7 tok/s | **67.8 tok/s** | **+48.4%** |
+| **Average TPS (single session)** | 19.7 tok/s | **27.2 tok/s** | **+38.1%** |
+| **Peak TPS (single session)** | 22.1 tok/s | **27.8 tok/s** | **+25.8%** |
+| **Steady-State TTFT** | 21,662 ms | **11,326 ms** | **1.9× faster** |
+| **Short Output (600 tok)** | 29.9 tok/s | **50.6 tok/s** | **+69.2%** |
+| **Concurrent (4 sessions)** | 45.7 tok/s | **66.5 tok/s** | **+45.5%** |
+| **KV Cache Capacity** | ~340,442 tokens | **2,220,470 tokens** | **6.5× headroom** |
 | **Max Working Context** | ~130,753 tokens | **~130,753 tokens** | Full 128K verified |
 
 ### 2. Smarts Benchmark (`benchmark_smarts.py`)
@@ -86,8 +87,10 @@
 ![Smarts benchmark scenarios with DFlash](assets/benchmark_smarts_dflash_1.png)
 ![Smarts benchmark category breakdown and final score with DFlash](assets/benchmark_smarts_dflash_2.png)
 
-- **Median Turn Latency**: Dropped from **16.9s down to 7.9s** (**2.1× faster per turn**).
-- **Responsiveness Score**: Increased from **7/100 to 19/100**.
+- **Overall Quality Score**: **90 / 100 (★★★★★ Excellent)** (27/30 pts across 15 scenarios, surpassing the 87/100 baseline).
+- **Deployability Score**: **68 / 100** (up from 63/100 baseline).
+- **Parameter Precision**: **100% (6/6)** (TC-06 multi-value extraction passed cleanly with wider sampling).
 - **Multi-Step Chains**: **100% (6/6)**.
 - **Restraint & Refusal**: **100% (6/6)**.
-- **Overall Quality Score**: **80/100** (24/30 pts across 15 scenarios).
+- **Error Recovery**: **83% (5/6)** (TC-14 recovered gracefully).
+- **Median Turn Latency**: **8.4s** (halved from 16.9s baseline).
