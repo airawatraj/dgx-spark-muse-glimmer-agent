@@ -28,8 +28,11 @@ try:
 except Exception as e:
     print(f"[entrypoint.py] Warning: Could not patch interfaces.py: {e}", file=sys.stderr)
 
-# Launch the official vLLM OpenAI API Server
-from vllm.entrypoints.openai.api_server import main
+# Ensure sys.argv starts with ['vllm', 'serve']
+if len(sys.argv) > 1 and sys.argv[1] != "serve":
+    sys.argv = [sys.argv[0], "serve"] + sys.argv[1:]
+
+from vllm.entrypoints.cli.main import main
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
