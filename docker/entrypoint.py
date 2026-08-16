@@ -5,6 +5,7 @@ Patches:
 1. SupportsEagle3 auxiliary layer resolution for multimodal backbones
 2. DFlash SWA sliding_window fallback
 3. DFlash encoder.* weight key mapping to model.fc / model.hidden_norm
+4. DFlash target_inner language model resolution for multimodal backbones
 before delegating to the vLLM CLI.
 """
 import re
@@ -12,6 +13,7 @@ import sys
 
 INTERFACES_PATH = "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/interfaces.py"
 QWEN3_DFLASH_PATH = "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen3_dflash.py"
+DFLASH_UTILS_PATH = "/usr/local/lib/python3.12/dist-packages/vllm/v1/worker/gpu/spec_decode/dflash/utils.py"
 
 # 1. Patch interfaces.py for SupportsEagle3 multimodal backbones
 try:
@@ -55,6 +57,20 @@ try:
         f.write(content)
 except Exception as e:
     print(f"[entrypoint.py] Warning: Could not patch qwen3_dflash.py: {e}", file=sys.stderr)
+
+# 3. Patch dflash/utils.py for target_inner resolution
+try:
+    with open(DFLASH_UTILS_PATH, "r") as f:
+        content = f.read()
+
+    target_line = "target_inner = target_language_model.model"
+    replacement_line = "target_inner = getattr(target_language_model, 'model', target_language_model)"
+    if target_line in content:
+        content = content.replace(target_line, replacement_line)
+        with open(DFLASH_UTILS_PATH, "w") as f:
+            f.write(content)
+except Exception as e:
+    print(f"[entrypoint.py] Warning: Could not patch dflash/utils.py: {e}", file=sys.stderr)
 
 # Ensure sys.argv starts with ['vllm', 'serve']
 if len(sys.argv) > 1 and sys.argv[1] != "serve":
