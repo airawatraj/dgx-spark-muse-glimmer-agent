@@ -81,6 +81,13 @@ echo ""
 # 2. Download DFlash Speculative Drafter model (~3 GB)
 download_repo "$DFLASH_MODEL_ID" "$DFLASH_CACHE_DIR" "DFlash Speculative Drafter"
 
+# Normalize drafter architecture in config.json to DFlashDraftModel for vLLM compatibility
+for cfg in $(find "$DFLASH_CACHE_DIR" -name "config.json" 2>/dev/null); do
+  if grep -q "MuseGlimmerAssistantModel" "$cfg" 2>/dev/null; then
+    sed -i 's/"MuseGlimmerAssistantModel"/"DFlashDraftModel"/g' "$cfg" 2>/dev/null || true
+  fi
+done
+
 echo ""
 echo "✓ All model weights verified in $HF_HOME."
 echo "Next: bash setup/preflight.sh && bash docker/start.sh"
