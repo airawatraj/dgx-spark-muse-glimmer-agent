@@ -10,13 +10,13 @@ CONTAINER="spark-brain"
 MODEL_ID="${MODEL_ID:-Inferact/Muse-Glimmer-30B-NVFP4-W4A4}"
 DFLASH_MODEL_ID="${DFLASH_MODEL_ID:-meta-models/Muse-Glimmer-30B-assistant}"
 ENABLE_DFLASH="${ENABLE_DFLASH:-1}"
-NUM_SPEC_TOKENS="${NUM_SPEC_TOKENS:-15}"
+NUM_SPEC_TOKENS="${NUM_SPEC_TOKENS:-16}"
 SERVED_NAME="${SERVED_NAME:-Cogni-Brain}"
 PORT="${PORT:-8000}"
-GPU_MEM_UTIL="${GPU_MEM_UTIL:-0.92}"
-KV_CACHE_BYTES="${KV_CACHE_BYTES:-4147483648}"
-MAX_BATCHED_TOKENS="${MAX_BATCHED_TOKENS:-8196}"
+GPU_MEM_UTIL="${GPU_MEM_UTIL:-0.65}"
+MAX_BATCHED_TOKENS="${MAX_BATCHED_TOKENS:-8192}"
 MAX_MODEL_LEN="${MAX_MODEL_LEN:-131072}"
+MAX_NUM_SEQS="${MAX_NUM_SEQS:-4}"
 
 # ── Preflight checks ──────────────────────────────────────────────────────────
 echo "=== spark-brain preflight ==="
@@ -54,6 +54,8 @@ echo "    Hardware:        NVIDIA DGX Spark (Grace-Blackwell sm_121a)"
 echo "    DFlash Drafter:  $([ "$ENABLE_DFLASH" = "1" ] && echo "$DFLASH_MODEL_ID (speculative tokens: $NUM_SPEC_TOKENS)" || echo "Disabled")"
 echo "    Context Window:  $MAX_MODEL_LEN tokens (128K)"
 echo "    Memory Util:     $GPU_MEM_UTIL"
+echo "    Max Batched:     $MAX_BATCHED_TOKENS"
+echo "    Max Seqs:        $MAX_NUM_SEQS"
 echo "    Port:            $PORT"
 echo ""
 
@@ -65,17 +67,21 @@ VLLM_ARGS=(
   --max-model-len "$MAX_MODEL_LEN"
   --gpu-memory-utilization "$GPU_MEM_UTIL"
   --kv-cache-dtype fp8
-  --kv-cache-memory-bytes "$KV_CACHE_BYTES"
   --max-num-batched-tokens "$MAX_BATCHED_TOKENS"
-  --max-num-seqs 8
+  --max-num-seqs "$MAX_NUM_SEQS"
   --load-format fastsafetensors
   --attention-backend triton_attn
+  --enable-prefix-caching
   --enable-chunked-prefill
+  --async-scheduling
+  --language-model-only
+  --trust-remote-code
+  --kernel-config '{"linear_backend":"flashinfer_cutlass"}'
   --enable-auto-tool-choice
   --tool-call-parser muse_glimmer
   --reasoning-parser muse_glimmer
   --generation-config auto
-  --override-generation-config '{"temperature": 0.7, "top_p": 0.8, "top_k": 20, "presence_penalty": 0.0, "repetition_penalty": 1.0}'
+  --override-generation-config '{"temperature": 1.0, "top_p": 0.95, "top_k": 64, "presence_penalty": 0.0, "repetition_penalty": 1.0}'
   --disable-log-stats
 )
 
@@ -95,6 +101,11 @@ docker run -d \
   --gpus all \
   --shm-size=16gb \
   -e HF_TOKEN="$HF_TOKEN" \
+  -e VLLM_MARLIN_USE_ATOMIC_ADD=1 \
+  -e TORCH_MATMUL_PRECISION=high \
+  -e FLASHINFER_DISABLE_VERSION_CHECK=1 \
+  -e NVIDIA_FORWARD_COMPAT=1 \
+  -e VLLM_HTTP_TIMEOUT_KEEP_ALIVE=600 \
   -v "$HOME/.cache/huggingface:/root/.cache/huggingface" \
   -v "${SCRIPT_DIR}/entrypoint.py:/entrypoint.py" \
   -p "${PORT}:8000" \
