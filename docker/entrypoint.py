@@ -1,8 +1,11 @@
 """
 docker/entrypoint.py
 Container bootstrap wrapper for Muse-Glimmer + DFlash Speculative Decoding.
-Patches SupportsEagle3 auxiliary layer resolution and DFlash SWA sliding_window
-fallback before delegating to the vLLM CLI.
+Patches:
+1. SupportsEagle3 auxiliary layer resolution for multimodal backbones
+2. DFlash SWA sliding_window fallback
+3. DFlash encoder.* weight key mapping to model.fc / model.hidden_norm
+before delegating to the vLLM CLI.
 """
 import re
 import sys
@@ -29,7 +32,7 @@ try:
 except Exception as e:
     print(f"[entrypoint.py] Warning: Could not patch interfaces.py: {e}", file=sys.stderr)
 
-# 2. Patch qwen3_dflash.py for sliding_window fallback
+# 2. Patch qwen3_dflash.py for sliding_window fallback and weight name mapping
 try:
     with open(QWEN3_DFLASH_PATH, "r") as f:
         content = f.read()
@@ -37,8 +40,19 @@ try:
     target_err = 'raise ValueError(\n                "DFlash sliding attention requires a window size configured in "\n                "dflash_config.swa_window_size or the top-level sliding_window."\n            )'
     if target_err in content:
         content = content.replace(target_err, "sliding_window = 4096")
-        with open(QWEN3_DFLASH_PATH, "w") as f:
-            f.write(content)
+
+    target_loop = 'if "t2d" in name:\n                continue'
+    replacement_loop = """if "t2d" in name:
+                continue
+            if name.startswith("encoder.fc"):
+                name = name.replace("encoder.fc", "fc")
+            elif name.startswith("encoder.output_norm_enc"):
+                name = name.replace("encoder.output_norm_enc", "hidden_norm")"""
+    if target_loop in content and "encoder.fc" not in content:
+        content = content.replace(target_loop, replacement_loop)
+
+    with open(QWEN3_DFLASH_PATH, "w") as f:
+        f.write(content)
 except Exception as e:
     print(f"[entrypoint.py] Warning: Could not patch qwen3_dflash.py: {e}", file=sys.stderr)
 
