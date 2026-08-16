@@ -8,7 +8,6 @@
 ![Tool Calling](https://img.shields.io/badge/tool--calling-muse__glimmer-green)
 ![Reasoning](https://img.shields.io/badge/reasoning-muse__glimmer-black)
 ![Quantization](https://img.shields.io/badge/quantization-NVFP4%20W4A4-purple)
-![Speculative Decoding](https://img.shields.io/badge/speculative-DFlash%20K%3D15-yellow)
 
 This repo documents my inference tuning experiments of [Inferact/Muse-Glimmer-30B-NVFP4-W4A4](https://huggingface.co/Inferact/Muse-Glimmer-30B-NVFP4-W4A4) on a single DGX Spark.
 
@@ -22,7 +21,6 @@ This repo documents my inference tuning experiments of [Inferact/Muse-Glimmer-30
 
 Key characteristics:
 - **NVFP4 W4A4 (Weight + Activation Quantization)** — Both weights and activations are quantized to FP4/INT4, targeting Grace-Blackwell Tensor Cores on the DGX Spark
-- **DFlash Speculative Acceleration** — Parallel draft head (`meta-models/Muse-Glimmer-30B-assistant`) with $K=15$ lookahead tokens for accelerated decoding
 - **muse_glimmer** tool-call and reasoning parsers (native, not adapted)
 - **128K token context window** (`--max-model-len 131072`)
 - Native `--enable-auto-tool-choice` support
@@ -42,13 +40,13 @@ export HF_TOKEN="your_hf_token_here"
 # 2. System prerequisites (swap disable, uv install, docker check)
 bash setup/install.sh
 
-# 3. Download model weights (one-time, target + DFlash assistant)
+# 3. Download model weights (one-time, ~60 GB)
 bash setup/download_model.sh
 
 # 4. Preflight check — validates GPU, swap, memory, Docker image, flag compat
 bash setup/preflight.sh
 
-# 5. Start vLLM container with NVFP4 W4A4 + DFlash Speculative Drafting
+# 5. Start vLLM container with NVFP4 W4A4
 bash docker/start.sh
 
 # 6. Check container status & logs
@@ -81,6 +79,8 @@ uv run benchmark/benchmark_speed.py --skip-context --skip-concurrent
 # Custom endpoint or model alias
 uv run benchmark/benchmark_speed.py --host localhost --port 8000 --model Cogni-Brain
 ```
+
+> Tests: baseline TPS, TPS vs output length, concurrent sessions (1–4), context window (up to 128K, the server's `--max-model-len`), health & KV stats.
 
 ### Smarts Benchmark (tool-eval-bench)
 
@@ -192,13 +192,11 @@ dgx-spark-muse-glimmer-agent/
 ├── CITATION.cff                  ← citation metadata
 ├── setup/
 │   ├── install.sh                ← prerequisites, swap disable, uv install
-│   ├── download_model.sh         ← fetch target and DFlash drafter weights
-│   └── preflight.sh              ← hardware & configuration verification
+│   └── download_model.sh         ← fetch NVFP4-W4A4 model weights via huggingface-cli
 ├── docker/
 │   ├── start.sh                  ← launch spark-brain via plain docker run
 │   ├── stop.sh                   ← stop and remove container
-│   ├── status.sh                 ← health check, memory, VmSwap, KV cache
-│   └── entrypoint.py             ← container bootstrap wrapper
+│   └── status.sh                 ← health check, memory, VmSwap, KV cache
 ├── benchmark/
 │   ├── benchmark_speed.py        ← TPS, TTFT, context-window benchmark
 │   ├── benchmark_speed_arena.py  ← overnight spark-arena-style llama-benchy sweep
@@ -210,11 +208,10 @@ dgx-spark-muse-glimmer-agent/
 
 ## Hardware & Architecture
 
-- **NVIDIA DGX Spark Mini PC** (GB10 Grace-Blackwell Superchip, sm_121a)
+- **NVIDIA DGX Spark Mini PC** (GB10 Grace-Blackwell Superchip)
 - **128 GB unified memory** (CPU + GPU shared)
 - **NVFP4 W4A4 Quantisation** — Both weights and activations quantized, enabling maximum throughput on Blackwell Tensor Cores
-- **DFlash Speculative Drafting** — Parallel drafting assistant with $K=15$ speculative lookahead tokens
-- **30B dense model** — Lower memory footprint than MoE alternatives; fits comfortably in DGX Spark unified memory
+- **30B dense model** — Lower memory footprint than MoE alternatives; fits comfortably in DGX Spark unified memory at `--gpu-memory-utilization 0.85`
 - Tool-calling and reasoning via native `muse_glimmer` parsers
 - `--generation-config auto` — uses model-embedded generation config for optimal quality/speed
 
@@ -225,20 +222,18 @@ dgx-spark-muse-glimmer-agent/
 | Parameter | Value | Reason |
 |---|---|---|
 | Model | `Inferact/Muse-Glimmer-30B-NVFP4-W4A4` | Native NVFP4 W4A4 quantized model |
-| Drafter Model | `meta-models/Muse-Glimmer-30B-assistant` | DFlash parallel speculative drafter ($K=15$) |
 | Docker image | `vllm/vllm-openai:muse-glimmer` | Muse-Glimmer specific vLLM build |
 | `--tensor-parallel-size` | `1` | Single DGX Spark (single GPU domain) |
 | `--max-model-len` | `131072` | Full 128K native context window |
 | `--max-num-seqs` | `8` | Reduces KV memory fragmentation under batching |
-| `--gpu-memory-utilization` | `0.92` | KV cache headroom in 128 GB unified memory |
-| `--kv-cache-dtype` | `fp8` | Native GB10 FP8 KV cache — ~15–25% TPS gain |
-| `--load-format` | `fastsafetensors` | Accelerated mmap weight loading |
-| `--attention-backend` | `triton_attn` | Optimized sm_121a attention kernel |
-| `--enable-chunked-prefill` | `true` | Prevents TTFT spikes on long context prompts |
-| `--disable-log-stats` | on | Removes metric collection overhead during inference |
+| `--gpu-memory-utilization` | `0.85` | More KV cache headroom — safe for 30B W4A4 model (~15–18 GB weights) in 128 GB unified memory |
+| `--kv-cache-dtype` | `fp8` | Native GB10 FP8 KV cache — ~15–25% TPS gain, negligible quality delta on already-quantized model |
+| `--disable-log-stats` | on | Removes Prometheus metric collection overhead during inference |
 | `--enable-auto-tool-choice` | on | Automatic tool call mode detection |
 | `--tool-call-parser` | `muse_glimmer` | Native Muse-Glimmer tool parser |
 | `--reasoning-parser` | `muse_glimmer` | Native thinking-token parser |
+| `--generation-config` | `auto` | Uses model-embedded optimal generation settings |
+| `--shm-size` | `16gb` | Shared memory allocation for the container |
 | Container name | `spark-brain` | Distinguishes from other models on same host |
 | Served model alias | `Cogni-Brain` | Single framework-agnostic agent name |
 
@@ -255,25 +250,18 @@ docker run -d \
   --shm-size=16gb \
   -e HF_TOKEN=$HF_TOKEN \
   -v ~/.cache/huggingface:/root/.cache/huggingface \
-  -v $(pwd)/docker/entrypoint.py:/entrypoint.py \
   -p 8000:8000 \
-  --entrypoint python3 \
   vllm/vllm-openai:muse-glimmer \
-  /entrypoint.py \
   Inferact/Muse-Glimmer-30B-NVFP4-W4A4 \
   --served-model-name Cogni-Brain \
   --tensor-parallel-size 1 \
   --max-model-len 131072 \
-  --gpu-memory-utilization 0.92 \
+  --gpu-memory-utilization 0.85 \
   --kv-cache-dtype fp8 \
   --max-num-seqs 8 \
-  --load-format fastsafetensors \
-  --attention-backend triton_attn \
-  --enable-chunked-prefill \
   --enable-auto-tool-choice \
   --tool-call-parser muse_glimmer \
   --reasoning-parser muse_glimmer \
-  --speculative-config '{"method":"dflash","num_speculative_tokens":15,"model":"meta-models/Muse-Glimmer-30B-assistant"}' \
   --generation-config auto \
   --disable-log-stats
 ```
