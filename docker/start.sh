@@ -85,6 +85,8 @@ if [[ "$ENABLE_DFLASH" == "1" ]]; then
   )
 fi
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # ── Launch via plain docker run ───────────────────────────────────────────────
 echo "Starting $CONTAINER (Muse-Glimmer-30B NVFP4 W4A4 + DFlash)..."
 
@@ -94,8 +96,11 @@ docker run -d \
   --shm-size=16gb \
   -e HF_TOKEN="$HF_TOKEN" \
   -v "$HOME/.cache/huggingface:/root/.cache/huggingface" \
+  -v "${SCRIPT_DIR}/entrypoint.py:/entrypoint.py" \
   -p "${PORT}:8000" \
+  --entrypoint python3 \
   vllm/vllm-openai:muse-glimmer \
+  /entrypoint.py \
   "${VLLM_ARGS[@]}"
 
 echo ""
