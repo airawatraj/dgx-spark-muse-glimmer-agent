@@ -167,7 +167,7 @@ uv run benchmark/benchmark_speed_arena.py \
 
 ### Spark Arena / llama-benchy (community benchmark)
 
-![Spark Arena Benchmark Results](assets/spark_arena_muse-glimmer-30b.png)
+![Spark Arena Benchmark Results](assets/spark_arena_muse-glimmer-30b-dflash.png)
 
 | Metric | Spark Arena Result |
 |---|---|
@@ -180,7 +180,23 @@ uv run benchmark/benchmark_speed_arena.py \
 | `--max-model-len` | 131,072 |
 | Context depths tested | 0, 4K, 8K, 16K, 32K, 64K, 128K |
 | Concurrency sweep | 1, 2, 5, 10 |
-| Data points | 28 |
+| Data points | 100 |
+
+#### llama-benchy Sweep Performance Summary (DFlash $K=16$ + NVFP4)
+
+| Context Depth | Total Context | Context Load Prefill (`ctx_pp`) | Query TTFT (`pp2048` with prefix cache) | Single Decode (`tg128`, c=1) | Concurrent Decode (`tg128`, c=5) |
+|---|---|---|---|---|---|
+| **0 (Baseline)** | 2,048 tok | — | **997 ms** (2,776 tok/s) | 24.2 tok/s | **56.9 tok/s** (peak 130) |
+| **4K (`d4096`)** | ~6.1K tok | 2,377 tok/s | **1,345 ms** (2,148 tok/s) | 16.1 tok/s | **35.7 tok/s** (peak 68) |
+| **16K (`d16384`)** | ~18.4K tok | 2,058 tok/s | **1,574 ms** (1,741 tok/s) | 12.6 tok/s | **32.2 tok/s** (peak 68) |
+| **32K (`d32768`)** | ~34.8K tok | 1,857 tok/s | **1,876 ms** (1,395 tok/s) | 14.4 tok/s | **31.8 tok/s** (peak 62) |
+| **64K (`d65535`)** | ~67.6K tok | 1,528 tok/s | **2,540 ms** (973 tok/s) | 10.8 tok/s | **26.8 tok/s** (peak 56) |
+| **128K (`d128768`)** | **~130.9K tok** | **1,123 tok/s** | **3,867 ms** (610 tok/s) | **10.7 tok/s** | **21.1 tok/s** (peak 46) |
+
+> **Highlights:**
+> - **128K Working Context:** Verified full 131K context window (`d128768` + `pp2048` + `tg128` = 130,944 tokens).
+> - **Prefix Caching Efficiency:** 128K query TTFT drops from **115.1s (cold)** to **3.86s (warm cache)** — a **30× speedup**.
+> - **Peak Decode Throughput:** Reaches up to **148.7 tok/s** at short context and sustains **46.0 tok/s** peak at 128K depth.
 
 ---
 
@@ -242,55 +258,6 @@ dgx-spark-muse-glimmer-agent/
 | `--override-generation-config` | `temperature: 1.0, top_p: 0.95, top_k: 64` | Broad sampling preventing early truncation in multi-value extractions |
 | Container name | `spark-brain` | Distinguishes from other models on same host |
 | Served model alias | `Cogni-Brain` | Single framework-agnostic agent name |
-
----
-
-## Raw Docker Command (Reference)
-
-The exact command this repo wraps in `docker/start.sh`:
-
-```bash
-docker run -d \
-  --name spark-brain \
-  --gpus all \
-  --shm-size=16gb \
-  -e HF_TOKEN=$HF_TOKEN \
-  -e VLLM_ALLOW_LONG_MAX_MODEL_LEN=1 \
-  -e VLLM_MARLIN_USE_ATOMIC_ADD=1 \
-  -e TORCH_MATMUL_PRECISION=high \
-  -e FLASHINFER_DISABLE_VERSION_CHECK=1 \
-  -e NVIDIA_FORWARD_COMPAT=1 \
-  -e VLLM_HTTP_TIMEOUT_KEEP_ALIVE=600 \
-  -v ~/.cache/huggingface:/root/.cache/huggingface \
-  -v ./docker/entrypoint.py:/entrypoint.py \
-  -p 8000:8000 \
-  --entrypoint python3 \
-  vllm/vllm-openai:muse-glimmer \
-  /entrypoint.py \
-  Inferact/Muse-Glimmer-30B-NVFP4-W4A4 \
-  --served-model-name Cogni-Brain \
-  --tensor-parallel-size 1 \
-  --max-model-len 131072 \
-  --gpu-memory-utilization 0.65 \
-  --kv-cache-dtype fp8 \
-  --max-num-batched-tokens 8192 \
-  --max-num-seqs 4 \
-  --load-format fastsafetensors \
-  --attention-backend triton_attn \
-  --enable-prefix-caching \
-  --enable-chunked-prefill \
-  --async-scheduling \
-  --language-model-only \
-  --trust-remote-code \
-  --kernel-config '{"linear_backend":"flashinfer_cutlass"}' \
-  --enable-auto-tool-choice \
-  --tool-call-parser muse_glimmer \
-  --reasoning-parser muse_glimmer \
-  --generation-config auto \
-  --override-generation-config '{"temperature": 1.0, "top_p": 0.95, "top_k": 64, "presence_penalty": 0.0, "repetition_penalty": 1.0}' \
-  --speculative-config '{"method":"dflash","num_speculative_tokens":16,"model":"meta-models/Muse-Glimmer-30B-assistant"}' \
-  --disable-log-stats
-```
 
 ---
 

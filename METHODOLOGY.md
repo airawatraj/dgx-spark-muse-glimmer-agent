@@ -19,6 +19,7 @@
 - [Issue 4: Safetensors Weight Name Mapping in Draft Model (`encoder.*` parameters)](#issue-4-safetensors-weight-name-mapping-in-draft-model-encoder-parameters)
 - [Issue 5: Language Model Inner Attribute Resolution in `dflash/utils.py`](#issue-5-language-model-inner-attribute-resolution-in-dflashutilspy)
 - [Performance Verification Summary](#performance-verification-summary)
+- [Historical Baseline Records (Stock vLLM without Speculation)](#historical-baseline-records-stock-vllm-without-speculation)
 
 ---
 
@@ -126,3 +127,20 @@ Prior to implementing DFlash speculative decoding and FlashInfer CUTLASS NVFP4 k
 | Responsiveness | **7 / 100** (median turn: 16.9s) |
 | Deployability | **63 / 100** (α=0.7) |
 | Passed Scenarios | 13 pass · 0 partial · 2 fail |
+
+### Historical Spark Arena Benchmark (Baseline Stock vLLM Run)
+
+![Historical Spark Arena Benchmark Results](assets/spark_arena_muse-glimmer-30b.png)
+
+| Metric | Spark Arena Result (Baseline Stock vLLM) |
+|---|---|
+| Run Link | [spark-arena.com/benchmark/ec3851cb-e755-4522-a3bf-f1806cbdd14f](https://spark-arena.com/benchmark/ec3851cb-e755-4522-a3bf-f1806cbdd14f) |
+| Run author | Rajendra Rawat |
+| Model | Inferact/Muse-Glimmer-30B-NVFP4-W4A4 |
+| Runtime | vLLM (vllm/vllm-openai:muse-glimmer) |
+| Tensor parallel | 1 |
+| Nodes | 1 |
+| `--max-model-len` | 131,072 |
+| Context depths tested | 0, 4K, 8K, 16K, 32K, 64K |
+| Concurrency sweep | 1, 2, 5, 10 |
+| Data points | 86 |
