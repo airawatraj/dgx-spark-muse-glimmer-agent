@@ -50,7 +50,7 @@ def build_command(args):
     concurrencies = args.concurrency
 
     if args.verify_128k:
-        depths = ["128896"]
+        depths = ["128768"]
         concurrencies = ["1"]
 
     cmd = [
@@ -103,8 +103,8 @@ def main():
     parser.add_argument(
         "--depth",
         nargs="+",
-        default=["0", "4096", "8192", "16384", "32768", "65535", "128896"],
-        help="Context depths to test. 128896 + 2048(pp) + 128(tg) = 131072 (exact full 128K context)",
+        default=["0", "4096", "8192", "16384", "32768", "65535", "128768"],
+        help="Context depths to test. 128768 + 2048(pp) + 128(tg) = 130944 (tests full 131K context window)",
     )
     parser.add_argument(
         "--concurrency",
@@ -115,7 +115,7 @@ def main():
     parser.add_argument(
         "--verify-128k",
         action="store_true",
-        help="Run a 60-second quick smoke test of ONLY the maximum 128K context point (depth=128896, concurrency=1)",
+        help="Run a 60-second quick smoke test of ONLY the maximum 128K context point (depth=128768, concurrency=1)",
     )
     parser.add_argument("--save-result", default="results_full.csv")
     args = parser.parse_args()
@@ -126,7 +126,7 @@ def main():
     result_line("Model", args.model)
     result_line("Served model name", args.served_model_name)
     result_line("Tokenizer", args.tokenizer)
-    result_line("Depths", " ".join(args.depth) if not args.verify_128k else "128896 (Quick 128K Verify)")
+    result_line("Depths", " ".join(args.depth) if not args.verify_128k else "128768 (Quick 128K Verify)")
     result_line("Output CSV", args.save_result)
     print()
     print(f"  {c('This sweep tests depths up to 128K context. Prefer to run it overnight.', 'yellow')}")

@@ -110,11 +110,11 @@ uv run benchmark/benchmark_speed_arena.py --save-result benchmark/results_full.c
 # 3. Custom endpoint or single depth
 uv run benchmark/benchmark_speed_arena.py \
   --base-url http://localhost:8000/v1 \
-  --depth 128896 \
+  --depth 128768 \
   --concurrency 1
 ```
 
-> **Depth Math:** `--depth 128896` + `--pp 2048` + `--tg 128` = **131,072 tokens** (100.0% exact native 128K context window). Full overnight sweep takes several hours; run in `tmux`.
+> **Depth Math:** `--depth 128768` + `--pp 2048` + `--tg 128` + chat template = **130,945 tokens** (tests full 131K context window cleanly under 131,072 limit). Full overnight sweep takes several hours; run in `tmux`.
 
 ---
 
