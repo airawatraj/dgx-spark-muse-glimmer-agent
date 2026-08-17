@@ -210,7 +210,8 @@ dgx-spark-muse-glimmer-agent/
 ├── CITATION.cff                  ← citation metadata
 ├── setup/
 │   ├── install.sh                ← prerequisites, swap disable, uv install
-│   └── download_model.sh         ← fetch NVFP4-W4A4 model & DFlash drafter weights
+│   ├── download_model.sh         ← fetch NVFP4-W4A4 model & DFlash drafter weights
+│   └── preflight.sh              ← pre-inference system, memory, and flag validation
 ├── docker/
 │   ├── start.sh                  ← launch spark-brain via plain docker run
 │   ├── entrypoint.py             ← container bootstrap wrapper with architecture patches

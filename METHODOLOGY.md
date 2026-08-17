@@ -2,7 +2,7 @@
 
 ## Architecture & Deployment Setup
 - **Main Model**: `Inferact/Muse-Glimmer-30B-NVFP4-W4A4` (30B Dense NVFP4 Weight + Activation quantized model)
-- **Speculative Draft Model**: `meta-models/Muse-Glimmer-30B-assistant` (DFlash Parallel Speculative Drafter, $K=15$ lookahead tokens)
+- **Speculative Draft Model**: `meta-models/Muse-Glimmer-30B-assistant` (DFlash Parallel Speculative Drafter, $K=16$ lookahead tokens)
 - **Serving Engine**: vLLM `v0.1.dev19075+gd89ec6d6a` (`vllm/vllm-openai:muse-glimmer`) running inside Docker on NVIDIA DGX Spark (`rawatlabs` single-GPU Grace-Blackwell host with 128GB Unified Memory, compute capability `sm_121a`).
 - **Deployment Strategy**:
   - Code edits and git commits originate on local MBP workspace.

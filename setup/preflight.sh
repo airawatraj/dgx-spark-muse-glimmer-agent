@@ -87,7 +87,7 @@ else
 fi
 
 if [[ "$FREE_GB" -ge 80 ]] 2>/dev/null; then
-  pass "${FREE_GB} GB free — ample headroom for target model + drafter + KV cache at gpu-util 0.92"
+  pass "${FREE_GB} GB free — ample headroom for target model + drafter + KV cache at gpu-util 0.65"
 elif [[ "$FREE_GB" -ge 50 ]] 2>/dev/null; then
   warn "${FREE_GB} GB free — may be tight; stop other processes before starting"
 else
