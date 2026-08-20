@@ -144,3 +144,24 @@ Prior to implementing DFlash speculative decoding and FlashInfer CUTLASS NVFP4 k
 | Context depths tested | 0, 4K, 8K, 16K, 32K, 64K |
 | Concurrency sweep | 1, 2, 5, 10 |
 | Data points | 86 |
+
+---
+
+## Experimental Learnings: Speculative Tuning vs Tool-Calling Trade-offs
+
+During optimization sweeps on DGX Spark GB10 (`sm_121a`), several experimental configurations were evaluated to maximize speculative decoding throughput:
+
+### 1. Sampling & Generation Config Sensitivity
+- **Attempted Tuning**: Injecting non-default sampling hyperparameters (e.g. `--override-generation-config` with sampling temperatures $> 0$ or custom `top_p`) yielded higher raw generation burst throughput in synthetic streaming microbenchmarks.
+- **Observed Regression**: Non-greedy sampling introduced non-deterministic branching into the model's native reasoning traces (`to=self`) and tool selection layers. This caused random tool skips on distractor tasks (e.g., answering real-time stock price questions from static weights rather than invoking `get_stock_price`), causing the tool evaluation quality score to drop from **90/100** to **77–87/100**.
+- **Conclusion**: Muse-Glimmer-30B NVFP4 requires deterministic greedy decoding (`--generation-config auto`, `temperature: 0.0`) to maintain reliable tool calling and high DFlash acceptance rates ($K=16$).
+
+### 2. Chat Template Knowledge Cutoff Boundaries
+- **Finding**: The default Onyx ATEM Jinja template rendered `Knowledge cutoff: 2026-01-04` and `Current date` metadata only when `has_system == false`. When external frameworks passed explicit system messages, the cutoff was omitted.
+- **Impact**: Without explicit knowledge cutoff boundaries, the model assumed its parametric pre-trained memory was unconstrained, failing distractor resistance tests. Ensuring the knowledge cutoff is present in all system prompts restores reliable tool invocation.
+
+### 3. Archived Experimental Speed Benchmark (Tune 2 Run)
+
+![Archived Speed Benchmark Tune 2 Run](assets/benchmark_speed_dflash_tune2.png)
+
+> **Archived for reference only:** The above run demonstrates the peak decode speed achieved during aggressive speculative decoding tuning. However, because it degraded tool calling accuracy below the 90/100 quality threshold, production configuration remains pinned to the verified **v1.2 (90/100 smarts, 27.5 tok/s steady-state, 68.8 tok/s 4-session)** baseline.
